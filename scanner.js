@@ -3,7 +3,7 @@
 
 /* =========================================
    BOTANIIQ — PLANT SCANNER
-   Teachable Machine + voice + plant information
+   Teachable Machine + native camera switching
    ========================================= */
 
 const MODEL_URL =
@@ -31,8 +31,6 @@ const PLANT_INFO = {
         ]
     },
 
-    // Matches your exact Teachable Machine label:
-    // Bryophyllum Pinnatum(Medicinal Plant)
     "bryophyllum pinnatum(medicinal plant)": {
         displayName: "Bryophyllum Pinnatum",
         category: "Medicinal Plant",
@@ -77,6 +75,7 @@ const PLANT_INFO = {
 
 const startButton = document.getElementById("start-camera");
 const stopButton = document.getElementById("stop-camera");
+const switchCameraButton = document.getElementById("switch-camera");
 const uploadInput = document.getElementById("image-upload");
 const speakButton = document.getElementById("speak-result");
 
@@ -103,16 +102,22 @@ const plantBenefits = document.getElementById("plant-benefits");
 // ---------- STATE ----------
 
 let model = null;
-let webcam = null;
+let cameraStream = null;
+let cameraVideo = null;
+
 let webcamRunning = false;
 let predictionBusy = false;
 let animationFrame = null;
+
+let cameraFacingMode = "environment";
+let cameraRequestId = 0;
 
 let latestPrediction = null;
 let candidatePlant = "";
 let candidateCount = 0;
 let lastSpokenPlant = "";
 let lastSpokenAt = 0;
+
 let currentSession = 0;
 let currentPreviewURL = null;
 
@@ -139,12 +144,10 @@ function isBackgroundNoise(name) {
 function getPlantInfo(name) {
     const key = normalizeName(name);
 
-    // First try an exact match.
     if (PLANT_INFO[key]) {
         return PLANT_INFO[key];
     }
 
-    // Support small differences in Teachable Machine labels.
     if (key.includes("bryophyllum pinnatum")) {
         return PLANT_INFO[
             "bryophyllum pinnatum(medicinal plant)"
@@ -214,7 +217,6 @@ function updatePlantInformation(className, confidence) {
     const info = getPlantInfo(className);
     const isConfident = confidence >= CONFIDENCE_THRESHOLD;
 
-    // Default for weeds, noise, uncertain results and unknown classes.
     showDefaultBenefits();
 
     if (!isConfident) {
@@ -264,8 +266,6 @@ function updatePlantInformation(className, confidence) {
         plantInfoDescription.textContent = info.description;
     }
 
-    // Only medicinal plants have benefits.
-    // Crab Grass has no benefits array.
     if (Array.isArray(info.benefits) && plantBenefits) {
         plantBenefits.replaceChildren();
 
@@ -282,16 +282,13 @@ function updatePlantInformation(className, confidence) {
 
 function speakText(message) {
     if (!("speechSynthesis" in window)) {
-        setMessage(
-            "Voice output is not supported in this browser."
-        );
+        setMessage("Voice output is not supported in this browser.");
         return;
     }
 
     window.speechSynthesis.cancel();
 
     const utterance = new SpeechSynthesisUtterance(message);
-
     utterance.lang = "en-IN";
     utterance.rate = 0.9;
     utterance.pitch = 1;
@@ -392,8 +389,7 @@ function showPredictions(predictions, forceSpeech = false) {
         }
 
         if (confidenceText) {
-            confidenceText.textContent =
-                "Confidence: " + percent + "%";
+            confidenceText.textContent = "Confidence: " + percent + "%";
         }
 
         if (isBackgroundNoise(best.className)) {
@@ -412,8 +408,7 @@ function showPredictions(predictions, forceSpeech = false) {
 
         if (confidenceText) {
             confidenceText.textContent =
-                "Best match: " + best.className +
-                " (" + percent + "%)";
+                "Best match: " + best.className + " (" + percent + "%)";
         }
 
         setMessage(
@@ -425,7 +420,6 @@ function showPredictions(predictions, forceSpeech = false) {
         confidenceFill.style.width = percent + "%";
     }
 
-    // Show probabilities for every model class.
     if (predictionList) {
         predictionList.replaceChildren();
 
@@ -456,10 +450,7 @@ function showPredictions(predictions, forceSpeech = false) {
             fill.className = "confidence-fill";
 
             fill.style.width =
-                Math.max(
-                    0,
-                    Math.min(100, prediction.probability * 100)
-                ) + "%";
+                Math.max(0, Math.min(100, prediction.probability * 100)) + "%";
 
             top.append(name, value);
             track.appendChild(fill);
@@ -469,12 +460,7 @@ function showPredictions(predictions, forceSpeech = false) {
     }
 
     updatePlantInformation(best.className, confidence);
-
-    handleAutomaticSpeech(
-        best.className,
-        confidence,
-        forceSpeech
-    );
+    handleAutomaticSpeech(best.className, confidence, forceSpeech);
 }
 
 
@@ -483,6 +469,7 @@ function showPredictions(predictions, forceSpeech = false) {
 async function loadModel() {
     if (startButton) startButton.disabled = true;
     if (stopButton) stopButton.disabled = true;
+    if (switchCameraButton) switchCameraButton.disabled = true;
     if (speakButton) speakButton.disabled = true;
 
     setStatus("Loading model...");
@@ -493,9 +480,7 @@ async function loadModel() {
             !MODEL_URL.startsWith("https://") ||
             MODEL_URL.includes("PASTE_YOUR_MODEL_URL_HERE")
         ) {
-            throw new Error(
-                "Replace MODEL_URL with your exported model URL."
-            );
+            throw new Error("Check your exported model URL.");
         }
 
         if (typeof tmImage === "undefined") {
@@ -517,19 +502,16 @@ async function loadModel() {
         if (speakButton) speakButton.disabled = false;
 
         setStatus("Model ready");
-
         setMessage(
             "AI model loaded. Start the camera or upload a plant photo."
         );
     } catch (error) {
         console.error("BotaniIQ model loading error:", error);
-
         model = null;
 
         if (startButton) startButton.disabled = true;
 
         setStatus("Model failed to load");
-
         setMessage(
             "Could not load AI model: " +
             (error.message || "Unknown error") +
@@ -539,7 +521,24 @@ async function loadModel() {
 }
 
 
-// ---------- CAMERA ----------
+// ---------- NATIVE CAMERA ----------
+
+function stopCameraTracks() {
+    if (cameraStream) {
+        cameraStream.getTracks().forEach(function (track) {
+            track.stop();
+        });
+
+        cameraStream = null;
+    }
+
+    if (cameraVideo) {
+        cameraVideo.pause();
+        cameraVideo.srcObject = null;
+        cameraVideo.remove();
+        cameraVideo = null;
+    }
+}
 
 async function startCamera() {
     if (!model) {
@@ -547,7 +546,10 @@ async function startCamera() {
         return;
     }
 
+    const requestId = ++cameraRequestId;
+
     stopCamera();
+    stopCameraTracks();
 
     currentSession++;
     resetSpeechTracking();
@@ -558,48 +560,128 @@ async function startCamera() {
         uploadedPreview.removeAttribute("src");
     }
 
+    if (cameraPlaceholder) {
+        cameraPlaceholder.hidden = true;
+    }
+
+    if (startButton) startButton.disabled = true;
+    if (stopButton) stopButton.disabled = false;
+    if (switchCameraButton) switchCameraButton.disabled = true;
+
+    setMessage(
+        cameraFacingMode === "environment"
+            ? "Requesting back camera..."
+            : "Requesting front camera..."
+    );
+    setStatus("Starting camera...");
+
     try {
-        webcam = new tmImage.Webcam(320, 320, true);
+        if (!navigator.mediaDevices ||
+            !navigator.mediaDevices.getUserMedia) {
+            throw new Error(
+                "Camera access is unavailable. Open BotaniIQ using HTTPS or localhost in a supported browser."
+            );
+        }
 
-        setMessage("Requesting camera permission...");
-        setStatus("Starting camera...");
+        let stream;
 
-        await webcam.setup();
-        await webcam.play();
+        try {
+            stream = await navigator.mediaDevices.getUserMedia({
+                audio: false,
+                video: {
+                    facingMode: { ideal: cameraFacingMode },
+                    width: { ideal: 640 },
+                    height: { ideal: 480 }
+                }
+            });
+        } catch (firstError) {
+            // Some devices do not support facingMode constraints.
+            // Try a basic video request as a fallback.
+            if (firstError.name === "NotAllowedError" ||
+                firstError.name === "SecurityError") {
+                throw firstError;
+            }
+
+            stream = await navigator.mediaDevices.getUserMedia({
+                audio: false,
+                video: true
+            });
+        }
+
+        // A newer camera request may have started while permission
+        // was pending. Do not keep an obsolete stream running.
+        if (requestId !== cameraRequestId) {
+            stream.getTracks().forEach(track => track.stop());
+            return;
+        }
+
+        cameraStream = stream;
+
+        cameraVideo = document.createElement("video");
+        cameraVideo.autoplay = true;
+        cameraVideo.muted = true;
+        cameraVideo.playsInline = true;
+        cameraVideo.setAttribute("playsinline", "");
+        cameraVideo.setAttribute("aria-label", "Live plant scanner camera");
+
+        cameraVideo.style.display = "block";
+        cameraVideo.style.width = "100%";
+        cameraVideo.style.height = "100%";
+        cameraVideo.style.objectFit = "cover";
+        cameraVideo.style.borderRadius = "inherit";
+
+        webcamContainer.replaceChildren(cameraVideo);
+        cameraVideo.srcObject = cameraStream;
+
+        await cameraVideo.play();
+
+        if (requestId !== cameraRequestId) {
+            stopCameraTracks();
+            return;
+        }
 
         webcamRunning = true;
 
-        if (webcamContainer) {
-            webcamContainer.replaceChildren(webcam.canvas);
-        }
-
-        if (cameraPlaceholder) {
-            cameraPlaceholder.hidden = true;
-        }
-
         if (startButton) startButton.disabled = true;
         if (stopButton) stopButton.disabled = false;
+        if (switchCameraButton) switchCameraButton.disabled = false;
 
-        setStatus("Camera on");
-        setMessage("Camera active. Point it at one plant.");
+        const track = cameraStream.getVideoTracks()[0];
+        const settings = track && track.getSettings
+            ? track.getSettings()
+            : {};
 
-        webcam.update();
+        // Update the active mode if the browser provides it.
+        if (settings.facingMode === "user" ||
+            settings.facingMode === "environment") {
+            cameraFacingMode = settings.facingMode;
+        }
+
+        if (switchCameraButton) {
+            switchCameraButton.textContent =
+                cameraFacingMode === "environment"
+                    ? "Switch to Front Camera"
+                    : "Switch to Back Camera";
+        }
+
+        setStatus(
+            cameraFacingMode === "environment"
+                ? "Back camera on"
+                : "Front camera on"
+        );
+
+        setMessage(
+            "Camera active. Point it at one plant."
+        );
 
         animationFrame = requestAnimationFrame(predictLoop);
     } catch (error) {
         console.error("BotaniIQ camera error:", error);
 
+        if (requestId !== cameraRequestId) return;
+
         webcamRunning = false;
-
-        if (webcam) {
-            try {
-                webcam.stop();
-            } catch (cleanupError) {
-                console.warn(cleanupError);
-            }
-        }
-
-        webcam = null;
+        stopCameraTracks();
 
         if (webcamContainer) {
             webcamContainer.replaceChildren();
@@ -609,19 +691,42 @@ async function startCamera() {
             cameraPlaceholder.hidden = false;
         }
 
-        if (startButton) startButton.disabled = false;
+        if (startButton) startButton.disabled = !model;
         if (stopButton) stopButton.disabled = true;
+        if (switchCameraButton) switchCameraButton.disabled = true;
 
         setStatus("Camera unavailable");
 
-        setMessage(
-            "Camera could not start. Allow camera permission or upload a photo instead."
-        );
+        if (error.name === "NotAllowedError" ||
+            error.name === "SecurityError") {
+            setMessage(
+                "Camera permission was denied. Allow camera access in your browser settings, then try again."
+            );
+        } else if (error.name === "NotFoundError") {
+            setMessage(
+                "No camera was found. You can still upload a plant photo."
+            );
+        } else {
+            setMessage(
+                "Camera could not start. Try switching cameras or upload a photo instead."
+            );
+        }
     }
 }
 
+async function switchCamera() {
+    if (!model) return;
+
+    cameraFacingMode =
+        cameraFacingMode === "environment"
+            ? "user"
+            : "environment";
+
+    await startCamera();
+}
+
 async function predictLoop() {
-    if (!webcamRunning || !webcam || predictionBusy) {
+    if (!webcamRunning || !cameraVideo || predictionBusy) {
         if (webcamRunning) {
             animationFrame = requestAnimationFrame(predictLoop);
         }
@@ -629,12 +734,15 @@ async function predictLoop() {
         return;
     }
 
+    if (cameraVideo.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) {
+        animationFrame = requestAnimationFrame(predictLoop);
+        return;
+    }
+
     predictionBusy = true;
 
     try {
-        webcam.update();
-
-        const predictions = await model.predict(webcam.canvas);
+        const predictions = await model.predict(cameraVideo);
 
         if (webcamRunning) {
             showPredictions(predictions);
@@ -652,6 +760,9 @@ async function predictLoop() {
 }
 
 function stopCamera() {
+    // Invalidate any camera request still awaiting permission.
+    cameraRequestId++;
+
     webcamRunning = false;
 
     if (animationFrame !== null) {
@@ -659,15 +770,7 @@ function stopCamera() {
         animationFrame = null;
     }
 
-    if (webcam) {
-        try {
-            webcam.stop();
-        } catch (error) {
-            console.warn("Camera cleanup error:", error);
-        }
-    }
-
-    webcam = null;
+    stopCameraTracks();
     predictionBusy = false;
 
     if (webcamContainer) {
@@ -682,12 +785,23 @@ function stopCamera() {
         stopButton.disabled = true;
     }
 
+    if (switchCameraButton) {
+        switchCameraButton.disabled = true;
+        switchCameraButton.textContent =
+            cameraFacingMode === "environment"
+                ? "Switch to Front Camera"
+                : "Switch to Back Camera";
+    }
+
     if (cameraPlaceholder) {
         cameraPlaceholder.hidden =
             uploadedPreview ? !uploadedPreview.hidden : false;
     }
 
-    if (cameraStatus && cameraStatus.textContent === "Camera on") {
+    if (cameraStatus &&
+        (cameraStatus.textContent === "Back camera on" ||
+         cameraStatus.textContent === "Front camera on" ||
+         cameraStatus.textContent === "Camera on")) {
         setStatus(model ? "Model ready" : "Loading model...");
     }
 }
@@ -747,13 +861,10 @@ async function handleImageUpload(event) {
             if (sessionAtStart !== currentSession) return;
 
             showPredictions(predictions, true);
-
             setStatus("Photo analyzed");
         } catch (error) {
             console.error("BotaniIQ image prediction error:", error);
-
             setStatus("Analysis failed");
-
             setMessage(
                 "Could not analyze this photo. Please try another image."
             );
@@ -764,7 +875,6 @@ async function handleImageUpload(event) {
 
     image.onerror = function () {
         setStatus("Image error");
-
         setMessage(
             "Could not open this image. Please choose another."
         );
@@ -791,29 +901,22 @@ function speakResult() {
 
     if (confidence < CONFIDENCE_THRESHOLD) {
         speakText(
-            "BotaniIQ is uncertain about this result. " +
-            "Please try another image."
+            "BotaniIQ is uncertain about this result. Please try another image."
         );
-
         return;
     }
 
     if (isBackgroundNoise(name)) {
         speakText(
-            "BotaniIQ detected background or noise. " +
-            "No recognized plant was identified."
+            "BotaniIQ detected background or noise. No recognized plant was identified."
         );
-
         return;
     }
 
     const info = getPlantInfo(name);
 
     if (!info) {
-        speakText(
-            "Information for this category is unavailable."
-        );
-
+        speakText("Information for this category is unavailable.");
         return;
     }
 
@@ -836,12 +939,7 @@ function speakResult() {
 // ---------- INITIALIZE ----------
 
 function initializeScanner() {
-    if (
-        !startButton ||
-        !stopButton ||
-        !uploadInput ||
-        !webcamContainer
-    ) {
+    if (!startButton || !stopButton || !uploadInput || !webcamContainer) {
         console.error(
             "BotaniIQ: One or more required scanner HTML elements are missing."
         );
@@ -856,6 +954,11 @@ function initializeScanner() {
     startButton.addEventListener("click", startCamera);
     stopButton.addEventListener("click", stopCamera);
     uploadInput.addEventListener("change", handleImageUpload);
+
+    if (switchCameraButton) {
+        switchCameraButton.addEventListener("click", switchCamera);
+        switchCameraButton.disabled = true;
+    }
 
     if (speakButton) {
         speakButton.addEventListener("click", speakResult);
