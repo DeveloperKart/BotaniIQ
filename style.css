@@ -1,0 +1,80 @@
+
+/* =====================================
+   BotaniIQ — Main Stylesheet
+   ===================================== */
+
+:root {
+    --primary-green: #174c35;
+    --secondary-green: #2f7653;
+    --accent-green: #a8c99a;
+    --background: #f7f8f2;
+    --surface: #ffffff;
+    --text-primary: #20352a;
+    --text-secondary: #68776c;
+    --border-color: #dfe7dc;
+
+    --font-main: Arial, Helvetica, sans-serif;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+html {
+    scroll-behavior: smooth;
+}
+
+body {
+    font-family: var(--font-main);
+    background: var(--background);
+    color: var(--text-primary);
+    line-height: 1.6;
+}
+
+button,
+input,
+textarea {
+    font: inherit;
+}
+
+button {
+    cursor: pointer;
+}
+
+a {
+    color: inherit;
+    text-decoration: none;
+}
+
+img {
+    max-width: 100%;
+    display: block;
+}
+
+.container {
+    width: min(1120px, 90%);
+    margin-inline: auto;
+}
+
+.primary-button {
+    display: inline-block;
+    padding: 12px 24px;
+    background: var(--primary-green);
+    color: #ffffff;
+    border: none;
+    border-radius: 8px;
+    font-weight: 600;
+    transition: background 0.2s ease;
+}
+
+.primary-button:hover {
+    background: var(--secondary-green);
+}
+
+@media (max-width: 600px) {
+    .container {
+        width: 92%;
+    }
+}
