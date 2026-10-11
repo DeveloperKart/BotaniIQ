@@ -4,84 +4,249 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="theme-color" content="#245c43">
+    <meta name="theme-color" content="#234B35">
+    <meta name="description" content="Identify plants with BotaniIQ's AI-powered plant scanner.">
 
-    <title>BotaniIQ — Plant Scanner</title>
+    <title>BotaniIQ | Plant Scanner</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
     <style>
         :root {
-            --green: #245c43;
-            --green-light: #e8f3eb;
-            --page: #f7f8f3;
-            --card: #ffffff;
-            --text: #23352b;
-            --muted: #6c7b70;
-            --border: #dce5dc;
+            --green: #234B35;
+            --green-light: #EAF1E8;
+            --green-soft: #F3F6EF;
+            --page: #F8F9F5;
+            --card: #FFFFFF;
+            --text: #24352A;
+            --muted: #748075;
+            --border: #E1E7DE;
+            --accent: #C7D9B7;
+            --shadow: 0 8px 28px rgba(35, 75, 53, 0.06);
         }
 
         * {
             box-sizing: border-box;
         }
 
+        html {
+            scroll-behavior: smooth;
+        }
+
         body {
             margin: 0;
             background: var(--page);
             color: var(--text);
-            font-family: Arial, sans-serif;
+            font-family: "DM Sans", sans-serif;
+            -webkit-font-smoothing: antialiased;
         }
 
-        header {
-            padding: 18px 5%;
-            background: var(--card);
+        a {
+            color: inherit;
+            text-decoration: none;
+        }
+
+        button, input {
+            font: inherit;
+        }
+
+        /* NAVIGATION */
+        .navbar {
+            position: relative;
+            z-index: 10;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 24px;
+            padding: 18px 7%;
+            background: rgba(255, 255, 255, 0.96);
             border-bottom: 1px solid var(--border);
         }
 
-        header h1 {
+        .brand {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            flex-shrink: 0;
+        }
+
+        .logo-icon {
+            font-size: 27px;
+        }
+
+        .logo-text {
+            color: var(--green);
+            font-family: "Outfit", sans-serif;
+            font-size: 1.65rem;
+            font-weight: 800;
+            letter-spacing: -0.7px;
+        }
+
+        .nav-right {
+            display: flex;
+            align-items: center;
+            gap: 28px;
+        }
+
+        .nav-links {
+            display: flex;
+            align-items: center;
+            gap: 25px;
+        }
+
+        .nav-links a {
+            color: #58675B;
+            font-size: 0.92rem;
+            font-weight: 600;
+            transition: color 0.2s;
+        }
+
+        .nav-links a:hover,
+        .nav-links a.active {
+            color: var(--green);
+        }
+
+        .nav-button,
+        .primary-button {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 9px;
+            min-height: 45px;
+            padding: 12px 21px;
+            border: 1px solid var(--green);
+            border-radius: 9px;
+            background: var(--green);
+            color: white;
+            font-weight: 700;
+            transition: background 0.2s, transform 0.2s;
+            cursor: pointer;
+        }
+
+        .nav-button:hover,
+        .primary-button:hover {
+            background: #183B29;
+            transform: translateY(-1px);
+        }
+
+        .menu-toggle {
+            display: none;
+            width: 42px;
+            height: 42px;
+            padding: 9px;
+            border: 1px solid var(--border);
+            border-radius: 9px;
+            background: white;
+            cursor: pointer;
+        }
+
+        .menu-toggle span {
+            display: block;
+            height: 2px;
+            margin: 5px 0;
+            background: var(--green);
+        }
+
+        /* PAGE INTRO */
+        .page-intro {
+            padding: 52px 6% 30px;
+            text-align: center;
+        }
+
+        .eyebrow {
+            margin: 0 0 12px;
+            color: var(--green);
+            font-size: 0.76rem;
+            font-weight: 700;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+
+        .page-intro h1 {
             margin: 0;
             color: var(--green);
-            font-size: 1.6rem;
+            font-family: "Outfit", sans-serif;
+            font-size: clamp(2rem, 4vw, 3.1rem);
+            font-weight: 700;
+            letter-spacing: -1px;
         }
 
-        header p {
-            margin: 5px 0 0;
+        .page-intro > p:last-child {
+            max-width: 600px;
+            margin: 14px auto 0;
             color: var(--muted);
-            font-size: 0.95rem;
+            font-size: 1rem;
+            line-height: 1.8;
         }
 
+        /* SCANNER LAYOUT */
         main {
-            width: min(1100px, 92%);
-            margin: 28px auto;
+            width: min(1160px, 90%);
+            margin: 0 auto 70px;
         }
 
         .scanner-layout {
             display: grid;
-            grid-template-columns: repeat(2, minmax(0, 1fr));
-            gap: 22px;
+            grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+            align-items: start;
+            gap: 24px;
         }
 
         .card {
             min-width: 0;
-            padding: 22px;
-            background: var(--card);
+            padding: 26px;
             border: 1px solid var(--border);
             border-radius: 18px;
+            background: var(--card);
+            box-shadow: var(--shadow);
         }
 
-        h2 {
-            margin: 0 0 16px;
-            font-size: 1.2rem;
+        .card-heading {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 20px;
         }
 
+        .heading-icon {
+            display: grid;
+            width: 43px;
+            height: 43px;
+            flex-shrink: 0;
+            place-items: center;
+            border-radius: 12px;
+            background: var(--green-light);
+            font-size: 21px;
+        }
+
+        .card h2 {
+            margin: 0;
+            color: var(--green);
+            font-family: "Outfit", sans-serif;
+            font-size: 1.3rem;
+            font-weight: 700;
+        }
+
+        .heading-subtitle {
+            margin: 4px 0 0;
+            color: var(--muted);
+            font-size: 0.83rem;
+        }
+
+        /* CAMERA */
         .camera-frame {
             position: relative;
             display: grid;
-            place-items: center;
             width: 100%;
             min-height: 260px;
             aspect-ratio: 4 / 3;
+            place-items: center;
             overflow: hidden;
-            background: var(--green-light);
+            border: 1px solid var(--border);
             border-radius: 14px;
+            background: var(--green-soft);
         }
 
         #webcam-container {
@@ -92,6 +257,7 @@
             overflow: hidden;
         }
 
+        #webcam-container canvas,
         #webcam-container video {
             display: block;
             width: 100%;
@@ -104,15 +270,21 @@
             inset: 0;
             z-index: 1;
             display: grid;
-            place-content: center;
-            padding: 24px;
+            align-content: center;
+            justify-items: center;
+            padding: 20px;
             color: var(--muted);
             text-align: center;
             pointer-events: none;
         }
 
         #camera-placeholder p {
-            margin: 7px 0;
+            margin: 5px 0;
+            line-height: 1.6;
+        }
+
+        #camera-placeholder p:first-child {
+            font-size: 2.4rem;
         }
 
         #uploaded-preview {
@@ -122,47 +294,53 @@
             width: 100%;
             height: 100%;
             object-fit: contain;
-            background: var(--green-light);
+            background: var(--green-soft);
         }
 
         .controls {
             display: flex;
             flex-wrap: wrap;
             gap: 9px;
-            margin-top: 16px;
+            margin-top: 18px;
         }
 
-        button,
+        .controls button,
         .upload-label {
             display: inline-flex;
-            justify-content: center;
-            align-items: center;
             min-height: 42px;
-            padding: 10px 15px;
+            flex: 1 1 auto;
+            align-items: center;
+            justify-content: center;
+            padding: 10px 13px;
             border: 1px solid var(--green);
-            border-radius: 10px;
+            border-radius: 9px;
             background: var(--green);
             color: white;
-            font: inherit;
+            font-size: 0.86rem;
+            font-weight: 600;
             cursor: pointer;
             text-align: center;
+            transition: background 0.2s;
         }
 
-        button:disabled {
-            opacity: 0.48;
-            cursor: not-allowed;
+        .controls button:hover:not(:disabled) {
+            background: #183B29;
         }
 
-        button.secondary,
-        .upload-label {
+        .controls button.secondary,
+        .controls .upload-label {
             background: white;
             color: var(--green);
         }
 
-        button:focus-visible,
-        .upload-label:focus-within {
-            outline: 3px solid #9bc5a8;
-            outline-offset: 3px;
+        .controls button.secondary:hover:not(:disabled),
+        .controls .upload-label:hover {
+            background: var(--green-light);
+        }
+
+        button:disabled {
+            opacity: 0.45;
+            cursor: not-allowed;
         }
 
         #image-upload {
@@ -171,276 +349,551 @@
             height: 1px;
             overflow: hidden;
             clip-path: inset(50%);
-            white-space: nowrap;
+        }
+
+        button:focus-visible,
+        .upload-label:focus-within {
+            outline: 3px solid var(--accent);
+            outline-offset: 3px;
         }
 
         .status {
-            margin: 14px 0 0;
+            margin: 18px 0 0;
             color: var(--muted);
-            font-size: 0.9rem;
+            font-size: 0.88rem;
+        }
+
+        #camera-status {
+            color: var(--green);
+            font-weight: 700;
         }
 
         #scanner-message {
-            margin: 10px 0 0;
-            line-height: 1.5;
+            min-height: 24px;
+            margin: 9px 0 0;
+            color: var(--text);
+            font-size: 0.91rem;
+            line-height: 1.6;
         }
 
+        /* RESULT BOXES */
         .result-box {
-            margin-top: 16px;
-            padding: 16px;
-            background: var(--green-light);
-            border-radius: 12px;
+            margin-top: 4px;
+            padding: 19px;
+            border: 1px solid #DFE9DB;
+            border-radius: 13px;
+            background: var(--green-soft);
         }
 
         .result-box h3 {
             margin: 0 0 8px;
             color: var(--green);
+            font-family: "Outfit", sans-serif;
+            font-size: 1.16rem;
             overflow-wrap: anywhere;
+        }
+
+        .result-box p {
+            margin: 8px 0 0;
+            color: var(--muted);
+            font-size: 0.92rem;
+            line-height: 1.65;
         }
 
         .confidence-track,
         .prediction-bar {
             height: 8px;
             overflow: hidden;
-            background: #d7e3d8;
             border-radius: 99px;
+            background: #DCE6D8;
         }
 
         .confidence-track {
-            margin-top: 8px;
+            margin-top: 13px;
         }
 
         .confidence-fill {
-            height: 100%;
             width: 0;
-            background: var(--green);
+            height: 100%;
             border-radius: inherit;
-            transition: width 0.2s ease;
+            background: var(--green);
+            transition: width 0.25s ease;
+        }
+
+        /* PREDICTIONS */
+        .info-section {
+            margin-top: 25px;
+            padding-top: 20px;
+            border-top: 1px solid var(--border);
+        }
+
+        .info-section h3 {
+            margin: 0 0 12px;
+            color: var(--green);
+            font-family: "Outfit", sans-serif;
+            font-size: 1.05rem;
+        }
+
+        .info-section p {
+            color: var(--muted);
+            font-size: 0.93rem;
+            line-height: 1.75;
+            overflow-wrap: anywhere;
         }
 
         .prediction-item {
             display: grid;
             grid-template-columns: minmax(0, 1fr) auto;
-            gap: 7px 12px;
-            margin-top: 15px;
+            gap: 8px 12px;
+            margin-top: 17px;
+        }
+
+        .prediction-label,
+        .prediction-score {
+            font-size: 0.85rem;
+            overflow-wrap: anywhere;
         }
 
         .prediction-label {
-            overflow-wrap: anywhere;
-            font-size: 0.9rem;
+            color: var(--text);
+            font-weight: 600;
         }
 
         .prediction-score {
-            font-size: 0.9rem;
+            color: var(--green);
+            font-weight: 700;
             font-variant-numeric: tabular-nums;
         }
 
         .prediction-bar {
             grid-column: 1 / -1;
-            height: 6px;
+            height: 7px;
         }
 
-        .prediction-fill {
-            height: 100%;
+        /* Support both class names used by scanner.js */
+        .prediction-fill,
+        .prediction-bar-fill {
             width: 0;
+            height: 100%;
+            border-radius: inherit;
             background: var(--green);
-            transition: width 0.15s ease;
+            transition: width 0.2s ease;
         }
 
-        .info-section {
-            margin-top: 22px;
-            padding-top: 18px;
-            border-top: 1px solid var(--border);
+        #plant-benefits {
+            padding-left: 22px;
         }
 
-        .info-section h3 {
-            margin: 0 0 8px;
-        }
-
-        .info-section p {
-            color: var(--muted);
-            line-height: 1.6;
-        }
-
-        .info-section li {
-            margin: 9px 0;
-            line-height: 1.5;
+        #plant-benefits li {
+            margin: 10px 0;
+            padding-left: 3px;
+            color: var(--text);
+            font-size: 0.92rem;
+            line-height: 1.65;
         }
 
         #speak-result {
-            margin-top: 18px;
+            margin-top: 20px;
         }
 
-        footer {
-            padding: 20px;
+        /* FOOTER */
+        .footer {
+            padding: 38px 7% 20px;
+            border-top: 1px solid var(--border);
+            background: white;
+        }
+
+        .footer-main {
+            display: grid;
+            grid-template-columns: 2fr 1fr 1fr;
+            gap: 38px;
+            max-width: 1160px;
+            margin: 0 auto;
+        }
+
+        .footer-logo {
+            display: inline-flex;
+            align-items: center;
+            gap: 9px;
+            color: var(--green);
+            font-family: "Outfit", sans-serif;
+            font-size: 1.35rem;
+            font-weight: 800;
+        }
+
+        .footer-logo-icon {
+            font-size: 24px;
+        }
+
+        .footer-description {
+            max-width: 340px;
             color: var(--muted);
-            text-align: center;
-            font-size: 0.85rem;
+            font-size: 0.9rem;
+            line-height: 1.8;
+        }
+
+        .footer-links {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 11px;
+        }
+
+        .footer-links h3 {
+            margin: 3px 0 5px;
+            color: var(--green);
+            font-family: "Outfit", sans-serif;
+            font-size: 1rem;
+        }
+
+        .footer-links a {
+            color: var(--muted);
+            font-size: 0.9rem;
+        }
+
+        .footer-links a:hover {
+            color: var(--green);
+        }
+
+        .footer-bottom {
+            display: flex;
+            justify-content: space-between;
+            gap: 16px;
+            max-width: 1160px;
+            margin: 30px auto 0;
+            padding-top: 18px;
+            border-top: 1px solid var(--border);
+            color: var(--muted);
+            font-size: 0.82rem;
+        }
+
+        .footer-bottom p {
+            margin: 0;
         }
 
         [hidden] {
             display: none !important;
         }
 
-        @media (max-width: 720px) {
-            main {
-                width: 94%;
-                margin: 18px auto;
+        /* RESPONSIVE */
+        @media (max-width: 900px) {
+            .navbar {
+                padding-right: 5%;
+                padding-left: 5%;
             }
 
-            .scanner-layout {
-                grid-template-columns: 1fr;
+            .nav-right {
                 gap: 16px;
             }
 
+            .nav-links {
+                gap: 14px;
+            }
+
+            .nav-links a {
+                font-size: 0.84rem;
+            }
+
+            main {
+                width: 94%;
+            }
+
             .card {
-                padding: 16px;
+                padding: 20px;
+            }
+        }
+
+        @media (max-width: 720px) {
+            .navbar {
+                flex-wrap: wrap;
+                padding: 15px 5%;
+            }
+
+            .menu-toggle {
+                display: block;
+            }
+
+            .nav-right {
+                display: none;
+                width: 100%;
+                align-items: stretch;
+                flex-direction: column;
+                gap: 18px;
+                padding: 12px 0 5px;
+            }
+
+            .nav-right.menu-open {
+                display: flex;
+            }
+
+            .nav-links {
+                align-items: stretch;
+                flex-direction: column;
+                gap: 0;
+            }
+
+            .nav-links a {
+                padding: 12px 0;
+                border-bottom: 1px solid var(--border);
+                font-size: 0.94rem;
+            }
+
+            .nav-button {
+                align-self: flex-start;
+            }
+
+            .page-intro {
+                padding: 38px 5% 24px;
+            }
+
+            main {
+                width: 92%;
+                margin-bottom: 45px;
+            }
+
+            .scanner-layout {
+                grid-template-columns: minmax(0, 1fr);
+                gap: 18px;
+            }
+
+            .card {
+                padding: 19px;
+                border-radius: 15px;
             }
 
             .camera-frame {
                 min-height: 220px;
             }
 
-            .controls > button,
-            .controls > .upload-label {
-                flex: 1 1 42%;
+            .controls button,
+            .controls .upload-label {
+                flex: 1 1 40%;
+            }
+
+            .footer-main {
+                grid-template-columns: 1fr 1fr;
+                gap: 28px 20px;
+            }
+
+            .footer-brand {
+                grid-column: 1 / -1;
+            }
+
+            .footer-bottom {
+                flex-direction: column;
+                line-height: 1.6;
+            }
+        }
+
+        @media (max-width: 380px) {
+            .controls button,
+            .controls .upload-label {
+                flex-basis: 100%;
             }
         }
     </style>
 </head>
 
 <body>
-    <header>
-        <h1>BotaniIQ</h1>
-        <p>Your AI-powered plant scanner</p>
-    </header>
 
-    <main>
-        <div class="scanner-layout">
+<header class="navbar">
+    <a href="index.html" class="brand" aria-label="BotaniIQ home">
+        <span class="logo-icon" aria-hidden="true">🌿</span>
+        <span class="logo-text">BotaniIQ</span>
+    </a>
 
-            <section class="card">
-                <h2>Plant Scanner</h2>
+    <button
+        class="menu-toggle"
+        id="menu-toggle"
+        type="button"
+        aria-label="Open navigation menu"
+        aria-controls="site-navigation"
+        aria-expanded="false"
+    >
+        <span></span>
+        <span></span>
+        <span></span>
+    </button>
 
-                <div class="camera-frame">
-                    <div id="webcam-container"></div>
+    <div class="nav-right" id="site-navigation">
+        <nav class="nav-links" aria-label="Main navigation">
+            <a href="index.html">Home</a>
+            <a href="index.html#plants">Plant Library</a>
+            <a href="index.html#features">How It Works</a>
+            <a href="index.html#about">About</a>
+        </nav>
 
-                    <div id="camera-placeholder">
-                        <p>🌿</p>
-                        <p>Your camera view will appear here.</p>
-                        <p>Start the camera or upload a plant photo.</p>
+        <a href="scanner.html" class="nav-button">Start Scanning</a>
+    </div>
+</header>
+
+<section class="page-intro">
+    <p class="eyebrow">AI-POWERED PLANT IDENTIFICATION</p>
+    <h1>Discover a Plant.</h1>
+    <p>
+        Bring nature into focus. Scan a plant or upload a photo
+        to explore its identity and learn more with BotaniIQ.
+    </p>
+</section>
+
+<main>
+    <div class="scanner-layout">
+
+        <section class="card">
+            <div class="card-heading">
+                <div class="heading-icon" aria-hidden="true">📷</div>
+                <div>
+                    <h2>Plant Scanner</h2>
+                    <p class="heading-subtitle">Scan live or upload a photo</p>
+                </div>
+            </div>
+
+            <div class="camera-frame">
+                <div id="webcam-container"></div>
+
+                <div id="camera-placeholder">
+                    <p>🌿</p>
+                    <p>Your camera view will appear here.</p>
+                    <p>Start the camera or upload a plant photo.</p>
+                </div>
+
+                <img id="uploaded-preview" alt="Uploaded plant preview" hidden>
+            </div>
+
+            <div class="controls">
+                <button id="start-camera" type="button">Start Camera</button>
+
+                <button id="stop-camera" class="secondary" type="button" disabled>
+                    Stop Camera
+                </button>
+
+                <button id="switch-camera" class="secondary" type="button" disabled>
+                    Switch Camera
+                </button>
+
+                <label class="upload-label" for="image-upload">Upload Photo</label>
+                <input id="image-upload" type="file" accept="image/*">
+            </div>
+
+            <p class="status">
+                Status: <span id="camera-status">Ready</span>
+            </p>
+
+            <p id="scanner-message" role="status" aria-live="polite">
+                Ready! Press Start Camera to begin.
+            </p>
+        </section>
+
+        <section class="card">
+            <div class="card-heading">
+                <div class="heading-icon" aria-hidden="true">🌱</div>
+                <div>
+                    <h2>Recognition Result</h2>
+                    <p class="heading-subtitle">Your AI prediction and plant information</p>
+                </div>
+            </div>
+
+            <div id="result-empty" class="result-box">
+                <h3>Ready to identify</h3>
+                <p>Point the camera at a plant or upload a photo to get started.</p>
+            </div>
+
+            <div class="info-section">
+                <h3>Model Predictions</h3>
+
+                <p id="prediction-placeholder">
+                    Confidence scores will appear when scanning starts.
+                </p>
+
+                <div id="prediction-list"></div>
+            </div>
+
+            <div id="result-content" hidden>
+                <div class="result-box">
+                    <h3 id="predicted-name">Waiting for a prediction</h3>
+                    <p id="confidence-text">Confidence: --</p>
+
+                    <div class="confidence-track">
+                        <div id="confidence-fill" class="confidence-fill"></div>
                     </div>
-
-                    <img
-                        id="uploaded-preview"
-                        alt="Uploaded plant preview"
-                        hidden
-                    >
-                </div>
-
-                <div class="controls">
-                    <button id="start-camera" type="button">
-                        Start Camera
-                    </button>
-
-                    <button
-                        id="stop-camera"
-                        class="secondary"
-                        type="button"
-                        disabled
-                    >
-                        Stop Camera
-                    </button>
-
-                    <button
-                        id="switch-camera"
-                        class="secondary"
-                        type="button"
-                        disabled
-                    >
-                        Switch Camera
-                    </button>
-
-                    <label class="upload-label" for="image-upload">
-                        Upload Photo
-                    </label>
-
-                    <input
-                        id="image-upload"
-                        type="file"
-                        accept="image/*"
-                    >
-                </div>
-
-                <p class="status">
-                    Status:
-                    <span id="camera-status">Ready</span>
-                </p>
-
-                <p id="scanner-message" role="status" aria-live="polite">
-                    Ready! Press Start Camera to begin.
-                </p>
-            </section>
-
-            <section class="card">
-                <h2>Recognition Result</h2>
-
-                <div id="result-empty" class="result-box">
-                    <h3>Ready to identify</h3>
-                    <p>Point the camera at a plant or upload a photo.</p>
                 </div>
 
                 <div class="info-section">
-                    <h3>Model Predictions</h3>
+                    <h3 id="plant-info-title">Plant information</h3>
 
-                    <p id="prediction-placeholder">
-                        Confidence scores will appear when scanning starts.
+                    <p id="plant-info-description">
+                        Identify a plant to see its information.
                     </p>
 
-                    <div id="prediction-list"></div>
+                    <h3>Benefits / Additional Information</h3>
+
+                    <ul id="plant-benefits">
+                        <li>Plant information will appear here.</li>
+                    </ul>
                 </div>
 
-                <div id="result-content" hidden>
-                    <div class="result-box">
-                        <h3 id="predicted-name">Waiting for a prediction</h3>
+                <button id="speak-result" class="primary-button" type="button" disabled>
+                    ♫ &nbsp; Speak Result
+                </button>
+            </div>
+        </section>
 
-                        <p id="confidence-text">Confidence: --</p>
+    </div>
+</main>
 
-                        <div class="confidence-track">
-                            <div
-                                id="confidence-fill"
-                                class="confidence-fill"
-                            ></div>
-                        </div>
-                    </div>
+<footer class="footer" id="about">
+    <div class="footer-main">
+        <div class="footer-brand">
+            <a href="index.html" class="footer-logo">
+                <span class="footer-logo-icon" aria-hidden="true">🌿</span>
+                <span>BotaniIQ</span>
+            </a>
 
-                    <div class="info-section">
-                        <h3 id="plant-info-title">Plant information</h3>
-
-                        <p id="plant-info-description">
-                            Identify a plant to see its information.
-                        </p>
-
-                        <h3>Benefits / Additional Information</h3>
-
-                        <ul id="plant-benefits">
-                            <li>Plant information will appear here.</li>
-                        </ul>
-                    </div>
-
-                    <button id="speak-result" type="button" disabled>
-                        Speak Result
-                    </button>
-                </div>
-            </section>
+            <p class="footer-description">
+                Making plant exploration more accessible through
+                technology and curiosity.
+            </p>
         </div>
-    </main>
 
-    <footer>
-        BotaniIQ · Educational plant recognition
-    </footer>
+        <div class="footer-links">
+            <h3>Explore</h3>
+            <a href="index.html">Home</a>
+            <a href="index.html#plants">Plant Library</a>
+            <a href="index.html#features">How It Works</a>
+        </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
-    <script src="scanner.js?v=7" defer></script>
+        <div class="footer-links">
+            <h3>Get Started</h3>
+            <a href="scanner.html">Start Scanning</a>
+            <a href="index.html#about">About BotaniIQ</a>
+        </div>
+    </div>
+
+    <div class="footer-bottom">
+        <p>© 2026 BotaniIQ. Built for learning and discovery.</p>
+        <p>Explore nature. Learn with AI.</p>
+    </div>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
+<script src="scanner.js?v=9" defer></script>
+
+<script>
+    const menuToggle = document.getElementById("menu-toggle");
+    const siteNavigation = document.getElementById("site-navigation");
+
+    if (menuToggle && siteNavigation) {
+        menuToggle.addEventListener("click", () => {
+            const isOpen = siteNavigation.classList.toggle("menu-open");
+            menuToggle.setAttribute("aria-expanded", String(isOpen));
+            menuToggle.setAttribute(
+                "aria-label",
+                isOpen ? "Close navigation menu" : "Open navigation menu"
+            );
+        });
+    }
+</script>
+<script src="scanner.js?v=9" defer></script>
 </body>
 </html>
