@@ -1,9 +1,14 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Explore nature with BotaniIQ, an AI-powered plant identification learning project.">
+
+    <meta
+        name="description"
+        content="Explore nature with BotaniIQ, an AI-powered plant identification learning project."
+    >
     <meta name="theme-color" content="#234B35">
 
     <title>BotaniIQ | Discover the World of Plants</title>
@@ -12,34 +17,59 @@
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <link
+        href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap"
+        rel="stylesheet"
+    >
 </head>
 
 <body>
-    <header class="navbar">
-        <a href="index.html" class="brand" aria-label="BotaniIQ home">
-            <span class="logo-icon" aria-hidden="true">🌿</span>
-            <span class="logo-text">BotaniIQ</span>
+
+    <!-- Navigation -->
+  
+<header class="navbar">
+    <a href="index.html" class="brand" aria-label="BotaniIQ home">
+        <span class="logo-icon" aria-hidden="true">🌿</span>
+        <span class="logo-text">BotaniIQ</span>
+    </a>
+
+    <!-- Hamburger button: visible on smaller screens -->
+    <button
+        class="menu-toggle"
+        id="menu-toggle"
+        type="button"
+        aria-label="Open navigation menu"
+        aria-controls="site-navigation"
+        aria-expanded="false"
+    >
+        <span></span>
+        <span></span>
+        <span></span>
+    </button>
+
+    <div class="nav-right" id="site-navigation">
+        <nav class="nav-links" aria-label="Main navigation">
+            <a href="index.html">Home</a>
+            <a href="#plants">Plant Library</a>
+            <a href="#features">How It Works</a>
+            <a href="#about">About</a>
+        </nav>
+
+        <a href="scanner.html" class="nav-button">
+            Start Scanning
         </a>
-
-        <div class="nav-right">
-            <nav class="nav-links" aria-label="Main navigation">
-                <a href="index.html">Home</a>
-                <a href="#plants">Plant Library</a>
-                <a href="#features">How It Works</a>
-                <a href="#about">About</a>
-            </nav>
-
-            <a href="scanner.html" class="nav-button">
-                Start Scanning
-            </a>
-        </div>
-    </header>
+    </div>
+</header>
 
     <main>
+
+        <!-- Hero Section -->
         <section class="hero">
             <div class="hero-text">
-                <p class="hero-label">AI-POWERED PLANT IDENTIFICATION</p>
+                <p class="hero-label">
+                    AI-POWERED PLANT IDENTIFICATION
+                </p>
 
                 <h1>Discover the World of Plants.</h1>
 
@@ -54,10 +84,15 @@
             </div>
 
             <div class="hero-image">
-                <!-- Add the original hero image here when we set up assets. -->
+                <img
+                    src="https://images.openai.com/static-rsc-4/krGjUTr5HFSiMIRQ_OuOrTd1uL5snXOZicdh6R8enDS0VIg3cpDyZnkMU7EsW4cMrmypXhwl6wG-y8qNpltXGYyk_wQbHZDMJj2YVTR8Kcea8yIZvq-SRVXeD6TFsSAVsss-9oclzTCqK2I2QFWYk5Ax81zaGzviumjHGK7VsRWFVdX9-gpOt1OLJMqy1Auh?purpose=fullsize"
+                    alt="Green plants in a botanical setting"
+                    fetchpriority="high"
+                >
             </div>
         </section>
 
+        <!-- Features Section -->
         <section class="features" id="features">
             <div class="features-heading">
                 <h2>Explore BotaniIQ</h2>
@@ -65,6 +100,7 @@
             </div>
 
             <div class="features-grid">
+
                 <article class="feature-card">
                     <div class="feature-icon" aria-hidden="true">⌕</div>
                     <h3>Live Scanning</h3>
@@ -88,51 +124,80 @@
                     <h3>Plant Knowledge</h3>
                     <p>Explore information about different plants.</p>
                 </article>
+
             </div>
         </section>
 
+        <!-- Featured Plants Section -->
         <section class="featured-plants" id="plants">
             <div class="plants-heading">
                 <p class="plants-label">EXPLORE NATURE</p>
                 <h2>Meet the Plants</h2>
+
                 <p class="plants-subtitle">
                     Discover the plants our AI model is learning to recognize.
                 </p>
             </div>
 
             <div class="plants-grid">
+
+                <!-- Tulsi -->
                 <article class="plant-card">
                     <div class="plant-image">
+                        <img
+                            src="https://images.openai.com/static-rsc-4/WzUarZFqW-F15uUtdasnceFogtQjGW4IwW8EnreE5i_PDmKtcIoF3ycYBOp9LmgnBd937Kl9ZjJrRvNhuSguVZVVoDKvRfxu-ZZYiaX8rgQTujeBsXhFHEx6k1DLkzOukphe4u4-I9O6ChgRD9ZZPWuE5iHWLRBNXZRyb7xkYC6ATgTrh-_TfMNJClo4vkIc?purpose=fullsize"
+                            alt="Tulsi plant"
+                            loading="lazy"
+                        >
                         <span class="plant-number">01</span>
                     </div>
+
                     <div class="plant-info">
                         <p class="plant-category">MEDICINAL PLANT</p>
                         <h3>Tulsi</h3>
-                        <p class="plant-scientific">Ocimum tenuiflorum</p>
+                        <p class="plant-scientific">
+                            Ocimum tenuiflorum
+                        </p>
                         <p class="plant-description">
                             An aromatic herb widely grown in Indian homes.
                         </p>
                     </div>
                 </article>
 
+                <!-- Bryophyllum -->
                 <article class="plant-card">
                     <div class="plant-image">
+                        <img
+                            src="https://images.openai.com/static-rsc-4/ALaRMDgyQ8aibkZiLgFcYHGyDBXAu3A_4E4H7ACUkzb603Ee2cxYr8-uDGlbsLLcHHGzh23a4ByALKPvk6M8_vZSxgLDD1FBUhOk0pWLQm8l3s2ne6ruLFVfWyNT7i-nEdcKHavnuSXqbV4dM9fTDEMfkujM5zj7czfH1qqmhaNQfiYCdzpf94pXHUbw1h2i?purpose=fullsize"
+                            alt="Bryophyllum plant"
+                            loading="lazy"
+                        >
                         <span class="plant-number">02</span>
                     </div>
+
                     <div class="plant-info">
                         <p class="plant-category">MEDICINAL PLANT</p>
                         <h3>Bryophyllum</h3>
-                        <p class="plant-scientific">Bryophyllum pinnatum</p>
+                        <p class="plant-scientific">
+                            Bryophyllum pinnatum
+                        </p>
                         <p class="plant-description">
                             A tropical succulent known for its distinctive leaves.
                         </p>
                     </div>
                 </article>
 
+                <!-- Aloe Vera -->
                 <article class="plant-card">
                     <div class="plant-image">
+                        <img
+                            src="https://images.openai.com/static-rsc-4/WOn0mLjcYHCl-LB3tEE1yYS2qqLwMvBmiyMoV76jch4rCjm2IqSdat3GWS5bBRdwTWGlKtz7D9s4DOH0sH13obX5fDaTOzQYivPblKyN729JgVpq03G-DglUvPzM_H98kvKxUZhftlyR2KXGiPoQ_qqtu7nhsQZSMuIhVamWF5mmoFj_I9ip9bgWSz1GnNiF?purpose=fullsize"
+                            alt="Aloe vera plant"
+                            loading="lazy"
+                        >
                         <span class="plant-number">03</span>
                     </div>
+
                     <div class="plant-info">
                         <p class="plant-category">MEDICINAL PLANT</p>
                         <h3>Aloe Vera</h3>
@@ -143,10 +208,17 @@
                     </div>
                 </article>
 
+                <!-- Crabgrass -->
                 <article class="plant-card">
                     <div class="plant-image">
+                        <img
+                            src="https://images.openai.com/static-rsc-4/Phc2aWw6DzU6jb4NQdi9lSnG9O6c4jK6SiQScbOse_cRTxVqJm6I_SEl4QxKnuZbzHUYMq8Zmo6QwthyupTyEbtAeKpHEZJ-HnzV-bVproP55TW5SuxzW8V1ZJgHqThB1LRq3rPBiXHqS6X2I7maO8fqH5YWO6-emQSnn-8zUKPsIkXTwAd3MVFo7RkDMTL_?purpose=fullsize"
+                            alt="Crabgrass weed"
+                            loading="lazy"
+                        >
                         <span class="plant-number">04</span>
                     </div>
+
                     <div class="plant-info">
                         <p class="plant-category weed-category">WEED</p>
                         <h3>Crabgrass</h3>
@@ -156,12 +228,17 @@
                         </p>
                     </div>
                 </article>
+
             </div>
         </section>
 
+        <!-- Call To Action -->
         <section class="cta-section">
             <div class="cta-content">
-                <p class="cta-label">YOUR NEXT DISCOVERY STARTS HERE</p>
+                <p class="cta-label">
+                    YOUR NEXT DISCOVERY STARTS HERE
+                </p>
+
                 <h2>Ready to Explore Nature?</h2>
 
                 <p class="cta-description">
@@ -178,10 +255,13 @@
                 </p>
             </div>
         </section>
+
     </main>
 
+    <!-- Footer -->
     <footer class="footer" id="about">
         <div class="footer-main">
+
             <div class="footer-brand">
                 <a href="index.html" class="footer-logo">
                     <span class="footer-logo-icon" aria-hidden="true">🌿</span>
@@ -189,7 +269,8 @@
                 </a>
 
                 <p class="footer-description">
-                    Making plant exploration more accessible through technology and curiosity.
+                    Making plant exploration more accessible through
+                    technology and curiosity.
                 </p>
             </div>
 
@@ -205,6 +286,7 @@
                 <a href="scanner.html">Start Scanning</a>
                 <a href="#about">About BotaniIQ</a>
             </div>
+
         </div>
 
         <div class="footer-bottom">
@@ -212,6 +294,7 @@
             <p>Explore nature. Learn with AI.</p>
         </div>
     </footer>
+
+<script src="script.js" defer></script>
 </body>
 </html>
-```
