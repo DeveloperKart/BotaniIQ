@@ -1,43 +1,32 @@
 
 "use strict";
 
-/* =========================================
-   BOTANIIQ — PLANT SCANNER
-   Teachable Machine + Android Camera Fix
-   Front/Back Camera + Upload + Voice
-   ========================================= */
+/* ==========================================
+   BOTANIIQ — ANDROID CAMERA DIAGNOSTIC FIX
+   ========================================== */
 
 const MODEL_URL =
     "https://teachablemachine.withgoogle.com/models/mIiK1Xitk/";
 
 const CONFIDENCE_THRESHOLD = 0.70;
-const REQUIRED_STABLE_PREDICTIONS = 3;
 const CAMERA_TIMEOUT_MS = 12000;
-
-const DEFAULT_BENEFITS_MESSAGE =
-    "Benefits will appear here if a plant is recognized.";
-
-
-// =========================================
-// 1. PLANT INFORMATION
-// =========================================
 
 const PLANT_INFO = {
     "tulsi (medicinal plant)": {
-        displayName: "Tulsi",
-        category: "Medicinal Plant",
+        name: "Tulsi",
+        type: "Medicinal Plant",
         description:
             "Tulsi, also known as holy basil, is an aromatic herb commonly grown in India.",
         benefits: [
             "Traditionally used in herbal preparations.",
             "Contains plant compounds studied for antioxidant activity.",
-            "Leaves are commonly used in traditional drinks and household preparations."
+            "Commonly used in traditional drinks and household preparations."
         ]
     },
 
     "bryophyllum pinnatum(medicinal plant)": {
-        displayName: "Bryophyllum Pinnatum",
-        category: "Medicinal Plant",
+        name: "Bryophyllum Pinnatum",
+        type: "Medicinal Plant",
         description:
             "Bryophyllum pinnatum is a succulent plant known for producing tiny plantlets along the edges of its leaves.",
         benefits: [
@@ -48,40 +37,42 @@ const PLANT_INFO = {
     },
 
     "aloe vera (medicinal plant)": {
-        displayName: "Aloe Vera",
-        category: "Medicinal Plant",
+        name: "Aloe Vera",
+        type: "Medicinal Plant",
         description:
             "Aloe vera is a succulent plant with thick, fleshy leaves containing a clear inner gel.",
         benefits: [
             "The gel is commonly used in skincare products.",
-            "Certain aloe vera gel preparations have been studied for skin-related uses.",
-            "It is widely grown as an ornamental and household plant."
+            "Some aloe vera gel preparations have been studied for skin-related uses.",
+            "Widely grown as an ornamental and household plant."
         ]
     },
 
     "crab grass (weed)": {
-        displayName: "Crab Grass",
-        category: "Weed",
+        name: "Crab Grass",
+        type: "Weed",
         description:
-            "Crab grass is a spreading grass commonly found in lawns, gardens and open areas. It grows close to the ground and can spread outward. It is often considered a weed in lawns and cultivated fields."
+            "Crab grass is a spreading grass commonly found in lawns, gardens and open areas.",
+        benefits: null
     },
 
     "background / noise": {
-        displayName: "Background / Noise",
-        category: "Unrecognized",
+        name: "Background / Noise",
+        type: "Unrecognized",
         description:
-            "This appears to be background or noise, not a recognized plant."
+            "The model detected background or noise rather than a recognized plant.",
+        benefits: null
     }
 };
 
 
-// =========================================
-// 2. HTML ELEMENTS
-// =========================================
+// ==========================================
+// 1. HTML ELEMENTS
+// ==========================================
 
 const startButton = document.getElementById("start-camera");
 const stopButton = document.getElementById("stop-camera");
-const switchCameraButton = document.getElementById("switch-camera");
+const switchButton = document.getElementById("switch-camera");
 const uploadInput = document.getElementById("image-upload");
 const speakButton = document.getElementById("speak-result");
 
@@ -89,8 +80,8 @@ const webcamContainer = document.getElementById("webcam-container");
 const cameraPlaceholder = document.getElementById("camera-placeholder");
 const uploadedPreview = document.getElementById("uploaded-preview");
 
-const cameraStatus = document.getElementById("camera-status");
 const scannerMessage = document.getElementById("scanner-message");
+const cameraStatus = document.getElementById("camera-status");
 
 const resultEmpty = document.getElementById("result-empty");
 const resultContent = document.getElementById("result-content");
@@ -105,47 +96,55 @@ const plantInfoDescription =
 const plantBenefits = document.getElementById("plant-benefits");
 
 
-// =========================================
-// 3. APPLICATION STATE
-// =========================================
+// ==========================================
+// 2. STATE
+// ==========================================
 
 let model = null;
 let cameraStream = null;
 let cameraVideo = null;
 
-let webcamRunning = false;
+let cameraRunning = false;
 let predictionBusy = false;
 let animationFrame = null;
 
-// Default to the front-facing camera.
+let cameraRequestId = 0;
 let cameraFacingMode = "user";
 
-// Identifies the currently active camera request.
-let cameraRequestId = 0;
-
 let latestPrediction = null;
+let currentObjectURL = null;
+let imageRequestId = 0;
 
-let candidatePlant = "";
-let candidateCount = 0;
-let lastSpokenPlant = "";
-let lastSpokenAt = 0;
-
-let currentSession = 0;
-let currentPreviewURL = null;
+let lastAutoSpokenName = "";
+let lastAutoSpokenTime = 0;
+let stableName = "";
+let stableCount = 0;
 
 
-// =========================================
-// 4. GENERAL HELPERS
-// =========================================
+// ==========================================
+// 3. GENERAL HELPERS
+// ==========================================
+
+function setMessage(message) {
+    if (scannerMessage) {
+        scannerMessage.textContent = message;
+    }
+}
+
+function setStatus(message) {
+    if (cameraStatus) {
+        cameraStatus.textContent = message;
+    }
+}
 
 function normalizeName(name) {
     return String(name || "")
-        .toLowerCase()
         .trim()
+        .toLowerCase()
         .replace(/\s+/g, " ");
 }
 
-function isBackgroundNoise(name) {
+function isNoise(name) {
     const key = normalizeName(name);
 
     return (
@@ -155,8 +154,8 @@ function isBackgroundNoise(name) {
     );
 }
 
-function getPlantInfo(name) {
-    const key = normalizeName(name);
+function getPlantInfo(className) {
+    const key = normalizeName(className);
 
     if (PLANT_INFO[key]) {
         return PLANT_INFO[key];
@@ -183,218 +182,163 @@ function getPlantInfo(name) {
     return null;
 }
 
-function setMessage(message) {
-    if (scannerMessage) {
-        scannerMessage.textContent = message;
+function releaseObjectURL() {
+    if (currentObjectURL) {
+        URL.revokeObjectURL(currentObjectURL);
+        currentObjectURL = null;
     }
 }
 
-function setStatus(message) {
-    if (cameraStatus) {
-        cameraStatus.textContent = message;
-    }
-}
-
-function resetSpeechTracking() {
-    candidatePlant = "";
-    candidateCount = 0;
-    lastSpokenPlant = "";
-    lastSpokenAt = 0;
+function resetSpeech() {
+    stableName = "";
+    stableCount = 0;
+    lastAutoSpokenName = "";
+    lastAutoSpokenTime = 0;
 
     if ("speechSynthesis" in window) {
         window.speechSynthesis.cancel();
     }
 }
 
-function releasePreviewURL() {
-    if (currentPreviewURL) {
-        URL.revokeObjectURL(currentPreviewURL);
-        currentPreviewURL = null;
-    }
-}
 
-function showDefaultBenefits() {
-    if (!plantBenefits) return;
+// ==========================================
+// 4. PLANT INFORMATION
+// ==========================================
 
-    plantBenefits.replaceChildren();
-
-    const item = document.createElement("li");
-    item.textContent = DEFAULT_BENEFITS_MESSAGE;
-
-    plantBenefits.appendChild(item);
-}
-
-
-// =========================================
-// 5. PLANT INFORMATION DISPLAY
-// =========================================
-
-function updatePlantInformation(className, confidence) {
+function updatePlantInfo(className, confidence) {
     const info = getPlantInfo(className);
 
-    showDefaultBenefits();
+    if (plantInfoTitle) {
+        plantInfoTitle.textContent = "Plant information";
+    }
+
+    if (plantInfoDescription) {
+        plantInfoDescription.textContent =
+            "Identify a plant to see its information.";
+    }
+
+    if (plantBenefits) {
+        plantBenefits.replaceChildren();
+    }
 
     if (confidence < CONFIDENCE_THRESHOLD) {
-        if (plantInfoTitle) {
-            plantInfoTitle.textContent = "Plant information";
-        }
-
-        if (plantInfoDescription) {
-            plantInfoDescription.textContent =
-                "Identify a plant to see its information.";
-        }
-
         return;
     }
 
-    if (isBackgroundNoise(className)) {
+    if (isNoise(className)) {
         if (plantInfoTitle) {
             plantInfoTitle.textContent = "Background / Noise";
         }
 
         if (plantInfoDescription) {
             plantInfoDescription.textContent =
-                "This appears to be background or noise, not a recognized plant.";
+                "Background or noise was detected. No recognized plant was identified.";
         }
 
         return;
     }
 
-    if (!info) {
-        if (plantInfoTitle) {
-            plantInfoTitle.textContent = "Plant information";
-        }
-
-        if (plantInfoDescription) {
-            plantInfoDescription.textContent =
-                "Information for this model category has not been added yet.";
-        }
-
-        return;
-    }
+    if (!info) return;
 
     if (plantInfoTitle) {
-        plantInfoTitle.textContent = info.displayName;
+        plantInfoTitle.textContent = info.name;
     }
 
     if (plantInfoDescription) {
         plantInfoDescription.textContent = info.description;
     }
 
-    if (Array.isArray(info.benefits) && plantBenefits) {
-        plantBenefits.replaceChildren();
-
+    if (plantBenefits && info.benefits) {
         info.benefits.forEach(function (benefit) {
-            const item = document.createElement("li");
-            item.textContent = benefit;
-            plantBenefits.appendChild(item);
+            const li = document.createElement("li");
+            li.textContent = benefit;
+            plantBenefits.appendChild(li);
         });
     }
 }
 
 
-// =========================================
-// 6. VOICE OUTPUT
-// =========================================
+// ==========================================
+// 5. VOICE OUTPUT
+// ==========================================
 
-function speakText(message) {
+function speakText(text) {
     if (!("speechSynthesis" in window)) {
-        setMessage("Voice output is not supported in this browser.");
+        setMessage("Voice output is unavailable in this browser.");
         return;
     }
 
     window.speechSynthesis.cancel();
 
-    const utterance = new SpeechSynthesisUtterance(message);
-
+    const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = "en-IN";
     utterance.rate = 0.9;
-    utterance.pitch = 1;
 
     window.speechSynthesis.speak(utterance);
 }
 
-function handleAutomaticSpeech(
-    className,
-    confidence,
-    force = false
-) {
+function automaticSpeech(className, confidence) {
     if (confidence < CONFIDENCE_THRESHOLD) {
-        candidatePlant = "";
-        candidateCount = 0;
+        stableName = "";
+        stableCount = 0;
         return;
     }
 
-    const now = Date.now();
-
-    if (className !== candidatePlant) {
-        candidatePlant = className;
-        candidateCount = 1;
+    if (className === stableName) {
+        stableCount++;
     } else {
-        candidateCount++;
+        stableName = className;
+        stableCount = 1;
     }
 
-    if (
-        !force &&
-        candidateCount < REQUIRED_STABLE_PREDICTIONS
-    ) {
-        return;
-    }
+    if (stableCount < 3) return;
 
-    if (className === lastSpokenPlant) {
-        return;
-    }
+    if (className === lastAutoSpokenName) return;
 
-    if (now - lastSpokenAt < 1500) {
+    if (Date.now() - lastAutoSpokenTime < 1500) return;
+
+    lastAutoSpokenName = className;
+    lastAutoSpokenTime = Date.now();
+
+    if (isNoise(className)) {
+        speakText(
+            "BotaniIQ detected background or noise. No recognized plant was identified."
+        );
         return;
     }
 
     const info = getPlantInfo(className);
-    let message = "";
 
-    if (isBackgroundNoise(className)) {
-        message =
-            "BotaniIQ detected background or noise. " +
-            "No recognized plant was identified.";
-    } else if (!info) {
-        message =
-            "BotaniIQ could not find information for this category.";
-    } else {
-        message =
-            "BotaniIQ identifies this plant as " +
-            info.displayName + ". " +
-            "Confidence " + Math.round(confidence * 100) +
-            " percent. " +
-            info.description + " ";
+    if (!info) return;
 
-        if (Array.isArray(info.benefits)) {
-            message +=
-                "Some information about its uses. " +
-                info.benefits.slice(0, 2).join(". ") + ". " +
-                "This is educational information, not medical advice.";
-        }
+    let message =
+        "BotaniIQ identifies this plant as " +
+        info.name + ". " + info.description;
+
+    if (info.benefits) {
+        message +=
+            " Some information about its uses. " +
+            info.benefits.slice(0, 2).join(". ") +
+            ". This is educational information, not medical advice.";
     }
-
-    lastSpokenPlant = className;
-    lastSpokenAt = now;
 
     speakText(message);
 }
 
 
-// =========================================
-// 7. PREDICTION DISPLAY
-// =========================================
+// ==========================================
+// 6. DISPLAY PREDICTIONS
+// ==========================================
 
-function showPredictions(predictions, forceSpeech = false) {
-    if (!predictions || predictions.length === 0) {
-        setMessage("No predictions were returned. Try another image.");
+function showPredictions(predictions, speakImmediately = false) {
+    if (!predictions || !predictions.length) {
+        setMessage("No predictions received.");
         return;
     }
 
-    const sorted = [...predictions].sort(function (a, b) {
-        return b.probability - a.probability;
-    });
+    const sorted = [...predictions].sort(
+        (a, b) => b.probability - a.probability
+    );
 
     const best = sorted[0];
     const confidence = best.probability;
@@ -409,47 +353,37 @@ function showPredictions(predictions, forceSpeech = false) {
     if (resultEmpty) resultEmpty.hidden = true;
     if (resultContent) resultContent.hidden = false;
 
-    if (confidence >= CONFIDENCE_THRESHOLD) {
-        if (predictedName) {
-            predictedName.textContent =
-                isBackgroundNoise(best.className)
-                    ? "Background / Noise"
-                    : (info ? info.displayName : best.className);
-        }
-
-        if (confidenceText) {
-            confidenceText.textContent =
-                "Confidence: " + percent + "%";
-        }
-
-        if (isBackgroundNoise(best.className)) {
-            setMessage(
-                "Background or noise detected. No recognized plant identified."
-            );
-        } else if (info && info.category === "Weed") {
-            setMessage("Weed identified.");
-        } else {
-            setMessage("Plant prediction updated.");
-        }
-    } else {
-        if (predictedName) {
+    if (predictedName) {
+        if (confidence < CONFIDENCE_THRESHOLD) {
             predictedName.textContent = "Uncertain result";
+        } else if (isNoise(best.className)) {
+            predictedName.textContent = "Background / Noise";
+        } else {
+            predictedName.textContent =
+                info ? info.name : best.className;
         }
+    }
 
-        if (confidenceText) {
-            confidenceText.textContent =
-                "Best match: " + best.className +
-                " (" + percent + "%)";
-        }
-
-        setMessage(
-            "The model is uncertain. Try a clearer photo with better lighting."
-        );
+    if (confidenceText) {
+        confidenceText.textContent =
+            "Confidence: " + percent + "%";
     }
 
     if (confidenceFill) {
         confidenceFill.style.width =
             Math.max(0, Math.min(100, percent)) + "%";
+    }
+
+    if (confidence < CONFIDENCE_THRESHOLD) {
+        setMessage(
+            "Uncertain prediction. Try a clearer image with better lighting."
+        );
+    } else if (isNoise(best.className)) {
+        setMessage(
+            "Background or noise detected. No recognized plant identified."
+        );
+    } else {
+        setMessage("Plant prediction updated.");
     }
 
     if (predictionList) {
@@ -459,25 +393,23 @@ function showPredictions(predictions, forceSpeech = false) {
             const row = document.createElement("div");
             row.className = "prediction-row";
 
-            const top = document.createElement("div");
-            top.className = "prediction-row-top";
+            const heading = document.createElement("div");
+            heading.className = "prediction-row-top";
 
-            const name = document.createElement("span");
+            const label = document.createElement("span");
             const predictionInfo = getPlantInfo(
                 prediction.className
             );
 
-            name.textContent =
-                isBackgroundNoise(prediction.className)
-                    ? "Background / Noise"
-                    : (
-                        predictionInfo
-                            ? predictionInfo.displayName
-                            : prediction.className
-                    );
+            label.textContent = isNoise(prediction.className)
+                ? "Background / Noise"
+                : (
+                    predictionInfo
+                        ? predictionInfo.name
+                        : prediction.className
+                );
 
             const value = document.createElement("span");
-
             value.textContent =
                 Math.round(prediction.probability * 100) + "%";
 
@@ -493,48 +425,51 @@ function showPredictions(predictions, forceSpeech = false) {
                     Math.min(100, prediction.probability * 100)
                 ) + "%";
 
-            top.append(name, value);
+            heading.append(label, value);
             track.appendChild(fill);
-            row.append(top, track);
-
+            row.append(heading, track);
             predictionList.appendChild(row);
         });
     }
 
-    updatePlantInformation(best.className, confidence);
+    updatePlantInfo(best.className, confidence);
 
-    handleAutomaticSpeech(
-        best.className,
-        confidence,
-        forceSpeech
-    );
+    if (speakImmediately) {
+        if (confidence >= CONFIDENCE_THRESHOLD) {
+            if (isNoise(best.className)) {
+                speakText(
+                    "Background or noise detected. No recognized plant identified."
+                );
+            } else if (info) {
+                speakText(
+                    "BotaniIQ identifies this plant as " +
+                    info.name + ". " + info.description
+                );
+            }
+        }
+    } else {
+        automaticSpeech(best.className, confidence);
+    }
 }
 
 
-// =========================================
-// 8. LOAD TEACHABLE MACHINE MODEL
-// =========================================
+// ==========================================
+// 7. LOAD MODEL
+// ==========================================
 
 async function loadModel() {
+    setStatus("Loading model...");
+    setMessage("Loading BotaniIQ AI model...");
+
     if (startButton) startButton.disabled = true;
     if (stopButton) stopButton.disabled = true;
-    if (switchCameraButton) switchCameraButton.disabled = true;
+    if (switchButton) switchButton.disabled = true;
     if (speakButton) speakButton.disabled = true;
 
-    setStatus("Loading model...");
-    setMessage("Connecting to your Teachable Machine model...");
-
     try {
-        if (
-            !MODEL_URL.startsWith("https://") ||
-            MODEL_URL.includes("PASTE_YOUR_MODEL_URL_HERE")
-        ) {
-            throw new Error("Check your exported model URL.");
-        }
-
         if (typeof tmImage === "undefined") {
             throw new Error(
-                "Teachable Machine library did not load. Check scanner.html and your internet connection."
+                "Teachable Machine library did not load. Check scanner.html."
             );
         }
 
@@ -551,33 +486,74 @@ async function loadModel() {
         if (speakButton) speakButton.disabled = false;
 
         setStatus("Model ready");
-
         setMessage(
-            "AI model loaded. Start the camera or upload a plant photo."
+            "Ready! Start the camera or upload a plant photo."
         );
+
     } catch (error) {
-        console.error("BotaniIQ model loading error:", error);
-
-        model = null;
-
-        if (startButton) startButton.disabled = true;
+        console.error("Model loading failed:", error);
 
         setStatus("Model failed to load");
-
         setMessage(
-            "Could not load AI model: " +
-            (error.message || "Unknown error") +
-            " Check MODEL_URL, model files, and internet connection."
+            "Could not load the AI model. Check the model URL and internet connection."
         );
     }
 }
 
 
-// =========================================
-// 9. CAMERA UTILITIES
-// =========================================
+// ==========================================
+// 8. CAMERA TIMEOUT HELPER
+// ==========================================
 
-function stopCameraTracks() {
+function getUserMediaWithTimeout(
+    constraints,
+    timeoutMs = CAMERA_TIMEOUT_MS
+) {
+    return new Promise(function (resolve, reject) {
+        let finished = false;
+
+        const timer = setTimeout(function () {
+            finished = true;
+
+            const error = new Error(
+                "Camera request timed out."
+            );
+
+            error.name = "CameraTimeoutError";
+
+            reject(error);
+        }, timeoutMs);
+
+        navigator.mediaDevices
+            .getUserMedia(constraints)
+            .then(function (stream) {
+                if (finished) {
+                    stream.getTracks().forEach(function (track) {
+                        track.stop();
+                    });
+                    return;
+                }
+
+                finished = true;
+                clearTimeout(timer);
+                resolve(stream);
+            })
+            .catch(function (error) {
+                if (finished) return;
+
+                finished = true;
+                clearTimeout(timer);
+                reject(error);
+            });
+    });
+}
+
+
+// ==========================================
+// 9. RELEASE CAMERA
+// ==========================================
+
+function releaseCameraTracks() {
     if (cameraStream) {
         cameraStream.getTracks().forEach(function (track) {
             track.stop();
@@ -594,70 +570,16 @@ function stopCameraTracks() {
     }
 }
 
-/*
- * Add a timeout to getUserMedia.
- *
- * Some mobile browsers can leave a camera request pending.
- * If a stream arrives after the timeout, stop its tracks.
- */
-function getUserMediaWithTimeout(
-    constraints,
-    timeoutMs = CAMERA_TIMEOUT_MS
-) {
-    return new Promise(function (resolve, reject) {
-        let settled = false;
-
-        const timer = setTimeout(function () {
-            settled = true;
-
-            const error = new Error("CAMERA_REQUEST_TIMEOUT");
-            error.name = "CameraTimeoutError";
-
-            reject(error);
-        }, timeoutMs);
-
-        navigator.mediaDevices
-            .getUserMedia(constraints)
-            .then(function (stream) {
-                if (settled) {
-                    stream.getTracks().forEach(function (track) {
-                        track.stop();
-                    });
-
-                    return;
-                }
-
-                settled = true;
-                clearTimeout(timer);
-                resolve(stream);
-            })
-            .catch(function (error) {
-                if (settled) return;
-
-                settled = true;
-                clearTimeout(timer);
-                reject(error);
-            });
-    });
-}
-
-
-// =========================================
-// 10. STOP CAMERA
-// =========================================
-
 function stopCamera() {
-    // Invalidate pending requests and old prediction loops.
     cameraRequestId++;
-
-    webcamRunning = false;
+    cameraRunning = false;
 
     if (animationFrame !== null) {
         cancelAnimationFrame(animationFrame);
         animationFrame = null;
     }
 
-    stopCameraTracks();
+    releaseCameraTracks();
 
     predictionBusy = false;
 
@@ -669,57 +591,36 @@ function stopCamera() {
         startButton.disabled = !model;
     }
 
-    if (stopButton) {
-        stopButton.disabled = true;
-    }
-
-    if (switchCameraButton) {
-        switchCameraButton.disabled = true;
-
-        switchCameraButton.textContent =
-            cameraFacingMode === "environment"
-                ? "Switch to Front Camera"
-                : "Switch to Back Camera";
-    }
+    if (stopButton) stopButton.disabled = true;
+    if (switchButton) switchButton.disabled = true;
 
     if (cameraPlaceholder) {
-        cameraPlaceholder.hidden =
-            uploadedPreview ? !uploadedPreview.hidden : false;
+        cameraPlaceholder.hidden = false;
     }
 
-    if (
-        cameraStatus &&
-        (
-            cameraStatus.textContent === "Back camera on" ||
-            cameraStatus.textContent === "Front camera on" ||
-            cameraStatus.textContent === "Camera on"
-        )
-    ) {
-        setStatus(model ? "Model ready" : "Loading model...");
-    }
+    if (model) setStatus("Model ready");
 }
 
 
-// =========================================
-// 11. START CAMERA
-// =========================================
+// ==========================================
+// 10. START FRONT CAMERA
+// ==========================================
 
 async function startCamera() {
     if (!model) {
-        setMessage("Please wait until the AI model is ready.");
+        setMessage("Please wait for the AI model to load.");
         return;
     }
 
-    // Release the previous camera first.
+    // Stop any previous camera before beginning a new request.
     stopCamera();
 
-    // IMPORTANT: create the ID after stopCamera().
+    // This ID belongs only to this request.
     const requestId = ++cameraRequestId;
 
-    currentSession++;
-
-    resetSpeechTracking();
-    releasePreviewURL();
+    imageRequestId++;
+    resetSpeech();
+    releaseObjectURL();
 
     if (uploadedPreview) {
         uploadedPreview.hidden = true;
@@ -732,15 +633,17 @@ async function startCamera() {
 
     if (startButton) startButton.disabled = true;
     if (stopButton) stopButton.disabled = false;
-    if (switchCameraButton) switchCameraButton.disabled = true;
+    if (switchButton) switchButton.disabled = true;
 
-    setStatus("Starting camera...");
+    // Diagnostic: always request the FRONT camera here.
+    cameraFacingMode = "user";
 
-    setMessage(
-        cameraFacingMode === "user"
-            ? "Requesting front camera..."
-            : "Requesting back camera..."
+    console.log(
+        "[BotaniIQ] Start Camera pressed. Requesting FRONT camera."
     );
+
+    setStatus("Requesting front camera...");
+    setMessage("Requesting FRONT camera...");
 
     try {
         if (
@@ -748,71 +651,42 @@ async function startCamera() {
             !navigator.mediaDevices.getUserMedia
         ) {
             throw new Error(
-                "Camera access requires HTTPS or localhost in a supported browser."
+                "Camera API unavailable. Open the HTTPS website in Chrome."
             );
         }
 
-        let stream;
-
-        try {
-            // Prefer the requested camera, without requiring an exact match.
-            stream = await getUserMediaWithTimeout({
-                audio: false,
-                video: {
-                    facingMode: {
-                        ideal: cameraFacingMode
-                    },
-                    width: { ideal: 640 },
-                    height: { ideal: 480 }
-                }
-            });
-
-        } catch (error) {
-            // Do not hide permission or timeout errors with a fallback.
-            if (
-                error.name === "NotAllowedError" ||
-                error.name === "SecurityError" ||
-                error.name === "CameraTimeoutError" ||
-                error.message === "CAMERA_REQUEST_TIMEOUT"
-            ) {
-                throw error;
+        // Explicitly request the FRONT camera.
+        const stream = await getUserMediaWithTimeout({
+            audio: false,
+            video: {
+                facingMode: "user",
+                width: { ideal: 640 },
+                height: { ideal: 480 }
             }
+        });
 
-            // Fallback for devices that reject facingMode constraints.
-            stream = await getUserMediaWithTimeout({
-                audio: false,
-                video: true
-            });
-        }
-
-        // A newer request may have replaced this one.
+        // If this request is no longer current, release the stream.
         if (requestId !== cameraRequestId) {
             stream.getTracks().forEach(function (track) {
                 track.stop();
             });
-
             return;
         }
 
         cameraStream = stream;
 
         cameraVideo = document.createElement("video");
-
         cameraVideo.autoplay = true;
         cameraVideo.muted = true;
         cameraVideo.playsInline = true;
 
         cameraVideo.setAttribute("playsinline", "");
-        cameraVideo.setAttribute(
-            "aria-label",
-            "Live plant scanner camera"
-        );
+        cameraVideo.setAttribute("aria-label", "BotaniIQ live camera");
 
         cameraVideo.style.width = "100%";
         cameraVideo.style.height = "100%";
         cameraVideo.style.display = "block";
         cameraVideo.style.objectFit = "cover";
-        cameraVideo.style.borderRadius = "inherit";
 
         webcamContainer.replaceChildren(cameraVideo);
         cameraVideo.srcObject = cameraStream;
@@ -820,58 +694,55 @@ async function startCamera() {
         await cameraVideo.play();
 
         if (requestId !== cameraRequestId) {
-            stopCameraTracks();
+            releaseCameraTracks();
             return;
         }
 
-        webcamRunning = true;
+        cameraRunning = true;
+
+        const videoTrack = cameraStream.getVideoTracks()[0];
+
+        const settings = videoTrack &&
+            videoTrack.getSettings
+            ? videoTrack.getSettings()
+            : {};
+
+        console.log(
+            "[BotaniIQ] Actual camera settings:",
+            settings
+        );
+
+        if (settings.facingMode) {
+            console.log(
+                "[BotaniIQ] Browser reports facingMode:",
+                settings.facingMode
+            );
+        }
 
         if (startButton) startButton.disabled = true;
         if (stopButton) stopButton.disabled = false;
-        if (switchCameraButton) switchCameraButton.disabled = false;
+        if (switchButton) switchButton.disabled = false;
 
-        // Read the actual camera mode if Chrome provides it.
-        const track = cameraStream.getVideoTracks()[0];
-
-        const settings =
-            track && track.getSettings
-                ? track.getSettings()
-                : {};
-
-        if (
-            settings.facingMode === "user" ||
-            settings.facingMode === "environment"
-        ) {
-            cameraFacingMode = settings.facingMode;
-        }
-
-        if (switchCameraButton) {
-            switchCameraButton.textContent =
-                cameraFacingMode === "user"
-                    ? "Switch to Back Camera"
-                    : "Switch to Front Camera";
-        }
-
-        setStatus(
-            cameraFacingMode === "user"
-                ? "Front camera on"
-                : "Back camera on"
+        setStatus("Front camera active");
+        setMessage(
+            "Front camera active. Point it at one plant."
         );
 
-        setMessage("Camera active. Point it at one plant.");
-
         animationFrame = requestAnimationFrame(function () {
-            predictLoop(requestId);
+            predictionLoop(requestId);
         });
 
     } catch (error) {
-        console.error("BotaniIQ camera error:", error);
+        console.error(
+            "[BotaniIQ] Front camera error:",
+            error.name,
+            error.message
+        );
 
-        // Ignore errors belonging to an outdated camera request.
         if (requestId !== cameraRequestId) return;
 
-        webcamRunning = false;
-        stopCameraTracks();
+        cameraRunning = false;
+        releaseCameraTracks();
 
         if (webcamContainer) {
             webcamContainer.replaceChildren();
@@ -883,7 +754,7 @@ async function startCamera() {
 
         if (startButton) startButton.disabled = !model;
         if (stopButton) stopButton.disabled = true;
-        if (switchCameraButton) switchCameraButton.disabled = true;
+        if (switchButton) switchButton.disabled = true;
 
         setStatus("Camera unavailable");
 
@@ -892,70 +763,76 @@ async function startCamera() {
             error.name === "SecurityError"
         ) {
             setMessage(
-                "Camera permission denied. Allow camera access in Chrome site settings, then reload BotaniIQ."
+                "Camera permission denied. Allow camera access in Android Chrome site settings."
             );
         } else if (
-            error.name === "CameraTimeoutError" ||
-            error.message === "CAMERA_REQUEST_TIMEOUT"
+            error.name === "CameraTimeoutError"
         ) {
             setMessage(
-                "Camera request timed out after 12 seconds. Check Chrome camera permission, close other apps using the camera, then retry."
+                "Front camera request timed out. Check Chrome camera permission and close other apps using the camera."
             );
         } else if (error.name === "NotFoundError") {
             setMessage(
-                "No camera found. You can upload a plant photo instead."
+                "No camera was found. You can upload a plant photo instead."
             );
         } else if (error.name === "NotReadableError") {
             setMessage(
-                "The camera may be busy. Close other apps using the camera and try again."
-            );
-        } else if (error.name === "OverconstrainedError") {
-            setMessage(
-                "The requested camera mode is unavailable. Try starting the camera again."
+                "The camera may be busy. Close other camera apps and try again."
             );
         } else {
             setMessage(
-                "Camera could not start. Check Chrome permissions and try again, or upload a plant photo."
+                "Front camera failed: " +
+                error.name +
+                ". Check camera permission and reload the page."
             );
         }
     }
 }
 
 
-// =========================================
-// 12. SWITCH FRONT / BACK CAMERA
-// =========================================
+// ==========================================
+// 11. SWITCH CAMERA
+// ==========================================
 
 async function switchCamera() {
-    if (!model || !webcamRunning) return;
+    if (!model || !cameraRunning) return;
 
+    // Stop the existing camera.
+    stopCamera();
+
+    // Select the opposite camera for the next request.
     cameraFacingMode =
         cameraFacingMode === "user"
             ? "environment"
             : "user";
 
-    await startCamera();
+    // This diagnostic build deliberately starts with the front camera.
+    // Back-camera testing will be restored after front-camera testing.
+    setMessage(
+        "Camera switching is temporarily disabled for diagnosis. Start the front camera first."
+    );
+
+    console.log(
+        "[BotaniIQ] Camera switch clicked. Requested mode:",
+        cameraFacingMode
+    );
+
+    cameraFacingMode = "user";
+
+    if (startButton) startButton.disabled = !model;
 }
 
 
-// =========================================
-// 13. LIVE PREDICTION LOOP
-// =========================================
+// ==========================================
+// 12. LIVE PREDICTION
+// ==========================================
 
-async function predictLoop(requestId) {
+async function predictionLoop(requestId) {
     if (
-        !webcamRunning ||
+        !cameraRunning ||
         !cameraVideo ||
         requestId !== cameraRequestId
     ) {
-        return;
-    }
-
-    if (predictionBusy) {
-        animationFrame = requestAnimationFrame(function () {
-            predictLoop(requestId);
-        });
-
         return;
     }
 
@@ -964,9 +841,15 @@ async function predictLoop(requestId) {
         HTMLMediaElement.HAVE_CURRENT_DATA
     ) {
         animationFrame = requestAnimationFrame(function () {
-            predictLoop(requestId);
+            predictionLoop(requestId);
         });
+        return;
+    }
 
+    if (predictionBusy) {
+        animationFrame = requestAnimationFrame(function () {
+            predictionLoop(requestId);
+        });
         return;
     }
 
@@ -976,35 +859,35 @@ async function predictLoop(requestId) {
         const predictions = await model.predict(cameraVideo);
 
         if (
-            webcamRunning &&
+            cameraRunning &&
             requestId === cameraRequestId
         ) {
             showPredictions(predictions);
         }
     } catch (error) {
-        console.error("BotaniIQ prediction error:", error);
+        console.error("Prediction failed:", error);
 
         if (requestId === cameraRequestId) {
-            setMessage("Prediction failed. Please try again.");
+            setMessage("Prediction failed. Try again.");
         }
     } finally {
         predictionBusy = false;
 
         if (
-            webcamRunning &&
+            cameraRunning &&
             requestId === cameraRequestId
         ) {
             animationFrame = requestAnimationFrame(function () {
-                predictLoop(requestId);
+                predictionLoop(requestId);
             });
         }
     }
 }
 
 
-// =========================================
-// 14. UPLOAD AND ANALYZE PHOTO
-// =========================================
+// ==========================================
+// 13. UPLOAD PHOTO
+// ==========================================
 
 async function handleImageUpload(event) {
     const file = event.target.files &&
@@ -1013,37 +896,35 @@ async function handleImageUpload(event) {
     if (!file) return;
 
     if (!file.type.startsWith("image/")) {
-        setMessage("Please select a valid image file.");
+        setMessage("Please choose a valid image file.");
         uploadInput.value = "";
         return;
     }
 
     if (!model) {
-        setMessage("Wait for the AI model to load before uploading.");
+        setMessage("Wait for the AI model to load first.");
         uploadInput.value = "";
         return;
     }
 
     stopCamera();
+    resetSpeech();
 
-    currentSession++;
+    const requestId = ++imageRequestId;
 
-    resetSpeechTracking();
-    releasePreviewURL();
+    releaseObjectURL();
 
-    const sessionAtStart = currentSession;
     const objectURL = URL.createObjectURL(file);
-
-    currentPreviewURL = objectURL;
-
-    setStatus("Analyzing photo");
-    setMessage("Analyzing your photo...");
+    currentObjectURL = objectURL;
 
     const image = new Image();
 
+    setStatus("Analyzing photo");
+    setMessage("Analyzing the uploaded photo...");
+
     image.onload = async function () {
         try {
-            if (sessionAtStart !== currentSession) return;
+            if (requestId !== imageRequestId) return;
 
             if (uploadedPreview) {
                 uploadedPreview.src = objectURL;
@@ -1056,55 +937,41 @@ async function handleImageUpload(event) {
 
             const predictions = await model.predict(image);
 
-            if (sessionAtStart !== currentSession) return;
+            if (requestId !== imageRequestId) return;
 
             showPredictions(predictions, true);
-
             setStatus("Photo analyzed");
 
         } catch (error) {
-            console.error(
-                "BotaniIQ image prediction error:",
-                error
-            );
+            console.error("Image analysis failed:", error);
 
-            if (sessionAtStart === currentSession) {
+            if (requestId === imageRequestId) {
                 setStatus("Analysis failed");
-
                 setMessage(
-                    "Could not analyze this photo. Please try another image."
+                    "Could not analyze the photo. Try another image."
                 );
             }
         } finally {
-            if (uploadInput) {
-                uploadInput.value = "";
-            }
+            uploadInput.value = "";
         }
     };
 
     image.onerror = function () {
-        if (sessionAtStart !== currentSession) return;
+        if (requestId !== imageRequestId) return;
 
         setStatus("Image error");
-
-        setMessage(
-            "Could not open this image. Please choose another."
-        );
-
-        releasePreviewURL();
-
-        if (uploadInput) {
-            uploadInput.value = "";
-        }
+        setMessage("Could not open this image. Choose another.");
+        releaseObjectURL();
+        uploadInput.value = "";
     };
 
     image.src = objectURL;
 }
 
 
-// =========================================
-// 15. MANUAL SPEAK BUTTON
-// =========================================
+// ==========================================
+// 14. MANUAL VOICE BUTTON
+// ==========================================
 
 function speakResult() {
     if (!latestPrediction) {
@@ -1117,49 +984,40 @@ function speakResult() {
 
     if (confidence < CONFIDENCE_THRESHOLD) {
         speakText(
-            "BotaniIQ is uncertain about this result. Please try another image."
+            "BotaniIQ is uncertain about this result. Try another image."
         );
-
         return;
     }
 
-    if (isBackgroundNoise(name)) {
+    if (isNoise(name)) {
         speakText(
-            "BotaniIQ detected background or noise. No recognized plant was identified."
+            "Background or noise detected. No recognized plant identified."
         );
-
         return;
     }
 
     const info = getPlantInfo(name);
 
     if (!info) {
-        speakText(
-            "Information for this category is unavailable."
-        );
-
+        speakText("Plant information is unavailable.");
         return;
     }
 
-    let message =
-        "BotaniIQ identifies this plant as " +
-        info.displayName + ". " +
-        info.description + " ";
+    let message = info.name + ". " + info.description;
 
-    if (Array.isArray(info.benefits)) {
-        message +=
-            "Some information about its uses. " +
-            info.benefits.slice(0, 2).join(". ") + ". " +
-            "This is educational information, not medical advice.";
+    if (info.benefits) {
+        message += " " + info.benefits.slice(0, 2).join(". ");
     }
+
+    message += " This is educational information, not medical advice.";
 
     speakText(message);
 }
 
 
-// =========================================
-// 16. INITIALIZE SCANNER
-// =========================================
+// ==========================================
+// 15. INITIALIZE
+// ==========================================
 
 function initializeScanner() {
     if (
@@ -1169,32 +1027,50 @@ function initializeScanner() {
         !webcamContainer
     ) {
         console.error(
-            "BotaniIQ: Required scanner HTML elements are missing."
+            "[BotaniIQ] Required scanner HTML elements are missing."
         );
 
         setMessage(
-            "Scanner setup error. Check the element IDs in scanner.html."
+            "Scanner setup error. Check the IDs in scanner.html."
         );
 
         return;
     }
 
-    startButton.addEventListener("click", startCamera);
-    stopButton.addEventListener("click", stopCamera);
+    startButton.type = "button";
+    stopButton.type = "button";
+
+    if (switchButton) {
+        switchButton.type = "button";
+    }
+
+    if (speakButton) {
+        speakButton.type = "button";
+    }
+
+    startButton.addEventListener("click", function (event) {
+        event.preventDefault();
+        startCamera();
+    });
+
+    stopButton.addEventListener("click", function (event) {
+        event.preventDefault();
+        stopCamera();
+    });
+
+    if (switchButton) {
+        switchButton.addEventListener("click", function (event) {
+            event.preventDefault();
+            switchCamera();
+        });
+
+        switchButton.disabled = true;
+    }
 
     uploadInput.addEventListener(
         "change",
         handleImageUpload
     );
-
-    if (switchCameraButton) {
-        switchCameraButton.addEventListener(
-            "click",
-            switchCamera
-        );
-
-        switchCameraButton.disabled = true;
-    }
 
     if (speakButton) {
         speakButton.addEventListener(
@@ -1208,15 +1084,31 @@ function initializeScanner() {
     stopButton.disabled = true;
     startButton.disabled = true;
 
-    showDefaultBenefits();
+    if (cameraPlaceholder) {
+        cameraPlaceholder.hidden = false;
+    }
+
+    console.log(
+        "[BotaniIQ] Diagnostic scanner loaded. Default camera: FRONT."
+    );
 
     loadModel();
 }
 
 
-// =========================================
-// 17. PAGE CLEANUP
-// =========================================
+// ==========================================
+// 16. CLEANUP
+// ==========================================
+
+window.addEventListener("pagehide", function () {
+    stopCamera();
+
+    if ("speechSynthesis" in window) {
+        window.speechSynthesis.cancel();
+    }
+
+    releaseObjectURL();
+});
 
 if (document.readyState === "loading") {
     document.addEventListener(
@@ -1227,13 +1119,3 @@ if (document.readyState === "loading") {
 } else {
     initializeScanner();
 }
-
-window.addEventListener("pagehide", function () {
-    stopCamera();
-
-    if ("speechSynthesis" in window) {
-        window.speechSynthesis.cancel();
-    }
-
-    releasePreviewURL();
-});
