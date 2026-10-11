@@ -3,8 +3,8 @@
 
 /* =========================================
    BOTANIIQ — PLANT SCANNER
-   Teachable Machine + Front/Back Camera
-   Image Upload + Voice Output
+   Teachable Machine + Android Camera Fix
+   Front/Back Camera + Upload + Voice
    ========================================= */
 
 const MODEL_URL =
@@ -12,6 +12,7 @@ const MODEL_URL =
 
 const CONFIDENCE_THRESHOLD = 0.70;
 const REQUIRED_STABLE_PREDICTIONS = 3;
+const CAMERA_TIMEOUT_MS = 12000;
 
 const DEFAULT_BENEFITS_MESSAGE =
     "Benefits will appear here if a plant is recognized.";
@@ -116,10 +117,10 @@ let webcamRunning = false;
 let predictionBusy = false;
 let animationFrame = null;
 
-// Front camera is the default.
+// Default to the front-facing camera.
 let cameraFacingMode = "user";
 
-// Prevents outdated camera requests from taking over.
+// Identifies the currently active camera request.
 let cameraRequestId = 0;
 
 let latestPrediction = null;
@@ -134,7 +135,7 @@ let currentPreviewURL = null;
 
 
 // =========================================
-// 4. HELPER FUNCTIONS
+// 4. GENERAL HELPERS
 // =========================================
 
 function normalizeName(name) {
@@ -313,7 +314,11 @@ function speakText(message) {
     window.speechSynthesis.speak(utterance);
 }
 
-function handleAutomaticSpeech(className, confidence, force = false) {
+function handleAutomaticSpeech(
+    className,
+    confidence,
+    force = false
+) {
     if (confidence < CONFIDENCE_THRESHOLD) {
         candidatePlant = "";
         candidateCount = 0;
@@ -378,7 +383,7 @@ function handleAutomaticSpeech(className, confidence, force = false) {
 
 
 // =========================================
-// 7. DISPLAY AI PREDICTIONS
+// 7. PREDICTION DISPLAY
 // =========================================
 
 function showPredictions(predictions, forceSpeech = false) {
@@ -458,7 +463,9 @@ function showPredictions(predictions, forceSpeech = false) {
             top.className = "prediction-row-top";
 
             const name = document.createElement("span");
-            const predictionInfo = getPlantInfo(prediction.className);
+            const predictionInfo = getPlantInfo(
+                prediction.className
+            );
 
             name.textContent =
                 isBackgroundNoise(prediction.className)
@@ -489,6 +496,7 @@ function showPredictions(predictions, forceSpeech = false) {
             top.append(name, value);
             track.appendChild(fill);
             row.append(top, track);
+
             predictionList.appendChild(row);
         });
     }
@@ -566,7 +574,7 @@ async function loadModel() {
 
 
 // =========================================
-// 9. STOP AND RELEASE CAMERA
+// 9. CAMERA UTILITIES
 // =========================================
 
 function stopCameraTracks() {
@@ -586,8 +594,60 @@ function stopCameraTracks() {
     }
 }
 
+/*
+ * Add a timeout to getUserMedia.
+ *
+ * Some mobile browsers can leave a camera request pending.
+ * If a stream arrives after the timeout, stop its tracks.
+ */
+function getUserMediaWithTimeout(
+    constraints,
+    timeoutMs = CAMERA_TIMEOUT_MS
+) {
+    return new Promise(function (resolve, reject) {
+        let settled = false;
+
+        const timer = setTimeout(function () {
+            settled = true;
+
+            const error = new Error("CAMERA_REQUEST_TIMEOUT");
+            error.name = "CameraTimeoutError";
+
+            reject(error);
+        }, timeoutMs);
+
+        navigator.mediaDevices
+            .getUserMedia(constraints)
+            .then(function (stream) {
+                if (settled) {
+                    stream.getTracks().forEach(function (track) {
+                        track.stop();
+                    });
+
+                    return;
+                }
+
+                settled = true;
+                clearTimeout(timer);
+                resolve(stream);
+            })
+            .catch(function (error) {
+                if (settled) return;
+
+                settled = true;
+                clearTimeout(timer);
+                reject(error);
+            });
+    });
+}
+
+
+// =========================================
+// 10. STOP CAMERA
+// =========================================
+
 function stopCamera() {
-    // Invalidate pending camera requests and prediction loops.
+    // Invalidate pending requests and old prediction loops.
     cameraRequestId++;
 
     webcamRunning = false;
@@ -641,7 +701,7 @@ function stopCamera() {
 
 
 // =========================================
-// 10. START CAMERA
+// 11. START CAMERA
 // =========================================
 
 async function startCamera() {
@@ -650,10 +710,10 @@ async function startCamera() {
         return;
     }
 
-    // Close the old camera before requesting a new one.
+    // Release the previous camera first.
     stopCamera();
 
-    // Create the new request ID AFTER stopCamera().
+    // IMPORTANT: create the ID after stopCamera().
     const requestId = ++cameraRequestId;
 
     currentSession++;
@@ -695,31 +755,37 @@ async function startCamera() {
         let stream;
 
         try {
-            stream = await navigator.mediaDevices.getUserMedia({
+            // Prefer the requested camera, without requiring an exact match.
+            stream = await getUserMediaWithTimeout({
                 audio: false,
                 video: {
-                    facingMode: { exact: cameraFacingMode },
+                    facingMode: {
+                        ideal: cameraFacingMode
+                    },
                     width: { ideal: 640 },
                     height: { ideal: 480 }
                 }
             });
+
         } catch (error) {
-            // Permission errors must be shown rather than bypassed.
+            // Do not hide permission or timeout errors with a fallback.
             if (
                 error.name === "NotAllowedError" ||
-                error.name === "SecurityError"
+                error.name === "SecurityError" ||
+                error.name === "CameraTimeoutError" ||
+                error.message === "CAMERA_REQUEST_TIMEOUT"
             ) {
                 throw error;
             }
 
-            // Fallback for devices that don't support the requested mode.
-            stream = await navigator.mediaDevices.getUserMedia({
+            // Fallback for devices that reject facingMode constraints.
+            stream = await getUserMediaWithTimeout({
                 audio: false,
                 video: true
             });
         }
 
-        // Discard streams from outdated requests.
+        // A newer request may have replaced this one.
         if (requestId !== cameraRequestId) {
             stream.getTracks().forEach(function (track) {
                 track.stop();
@@ -764,12 +830,14 @@ async function startCamera() {
         if (stopButton) stopButton.disabled = false;
         if (switchCameraButton) switchCameraButton.disabled = false;
 
+        // Read the actual camera mode if Chrome provides it.
         const track = cameraStream.getVideoTracks()[0];
-        const settings = track && track.getSettings
-            ? track.getSettings()
-            : {};
 
-        // Use the actual facing mode when the browser reports it.
+        const settings =
+            track && track.getSettings
+                ? track.getSettings()
+                : {};
+
         if (
             settings.facingMode === "user" ||
             settings.facingMode === "environment"
@@ -792,7 +860,6 @@ async function startCamera() {
 
         setMessage("Camera active. Point it at one plant.");
 
-        // Pass the request ID to this camera's prediction loop.
         animationFrame = requestAnimationFrame(function () {
             predictLoop(requestId);
         });
@@ -800,6 +867,7 @@ async function startCamera() {
     } catch (error) {
         console.error("BotaniIQ camera error:", error);
 
+        // Ignore errors belonging to an outdated camera request.
         if (requestId !== cameraRequestId) return;
 
         webcamRunning = false;
@@ -824,15 +892,30 @@ async function startCamera() {
             error.name === "SecurityError"
         ) {
             setMessage(
-                "Camera permission denied. Allow camera access in your browser settings and try again."
+                "Camera permission denied. Allow camera access in Chrome site settings, then reload BotaniIQ."
+            );
+        } else if (
+            error.name === "CameraTimeoutError" ||
+            error.message === "CAMERA_REQUEST_TIMEOUT"
+        ) {
+            setMessage(
+                "Camera request timed out after 12 seconds. Check Chrome camera permission, close other apps using the camera, then retry."
             );
         } else if (error.name === "NotFoundError") {
             setMessage(
                 "No camera found. You can upload a plant photo instead."
             );
+        } else if (error.name === "NotReadableError") {
+            setMessage(
+                "The camera may be busy. Close other apps using the camera and try again."
+            );
+        } else if (error.name === "OverconstrainedError") {
+            setMessage(
+                "The requested camera mode is unavailable. Try starting the camera again."
+            );
         } else {
             setMessage(
-                "Camera could not start. Check camera permissions, close other apps using the camera, or try uploading a photo."
+                "Camera could not start. Check Chrome permissions and try again, or upload a plant photo."
             );
         }
     }
@@ -840,7 +923,7 @@ async function startCamera() {
 
 
 // =========================================
-// 11. SWITCH FRONT / BACK CAMERA
+// 12. SWITCH FRONT / BACK CAMERA
 // =========================================
 
 async function switchCamera() {
@@ -856,11 +939,10 @@ async function switchCamera() {
 
 
 // =========================================
-// 12. LIVE PREDICTION LOOP
+// 13. LIVE PREDICTION LOOP
 // =========================================
 
 async function predictLoop(requestId) {
-    // Do not let an old camera session continue predicting.
     if (
         !webcamRunning ||
         !cameraVideo ||
@@ -921,7 +1003,7 @@ async function predictLoop(requestId) {
 
 
 // =========================================
-// 13. UPLOAD AND ANALYZE A PLANT PHOTO
+// 14. UPLOAD AND ANALYZE PHOTO
 // =========================================
 
 async function handleImageUpload(event) {
@@ -979,6 +1061,7 @@ async function handleImageUpload(event) {
             showPredictions(predictions, true);
 
             setStatus("Photo analyzed");
+
         } catch (error) {
             console.error(
                 "BotaniIQ image prediction error:",
@@ -1020,7 +1103,7 @@ async function handleImageUpload(event) {
 
 
 // =========================================
-// 14. MANUAL SPEAK BUTTON
+// 15. MANUAL SPEAK BUTTON
 // =========================================
 
 function speakResult() {
@@ -1075,7 +1158,7 @@ function speakResult() {
 
 
 // =========================================
-// 15. INITIALIZE SCANNER
+// 16. INITIALIZE SCANNER
 // =========================================
 
 function initializeScanner() {
@@ -1086,7 +1169,7 @@ function initializeScanner() {
         !webcamContainer
     ) {
         console.error(
-            "BotaniIQ: One or more required scanner HTML elements are missing."
+            "BotaniIQ: Required scanner HTML elements are missing."
         );
 
         setMessage(
@@ -1132,7 +1215,7 @@ function initializeScanner() {
 
 
 // =========================================
-// 16. PAGE CLEANUP
+// 17. PAGE CLEANUP
 // =========================================
 
 if (document.readyState === "loading") {
